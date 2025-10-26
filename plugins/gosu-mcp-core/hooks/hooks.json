@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse":[
+      {
+        "matcher": "Read|Edit|MultiEdit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/block_dangerous_tool_usages.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
