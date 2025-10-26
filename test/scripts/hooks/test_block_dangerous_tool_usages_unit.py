@@ -30,8 +30,7 @@ from pathlib import Path
 from io import StringIO
 
 # Add hooks script dir to system path to import the module
-hooks_script_dir = Path(__file__).parent.parent.parent.parent / 'plugins' /'gosu-mcp-core' / 'hooks' 
-print("\n Script dir:", hooks_script_dir)
+hooks_script_dir = Path(__file__).parent.parent.parent.parent / 'plugins' / 'gosu-mcp-core' / 'hooks' 
 sys.path.insert(0, str(hooks_script_dir))
 
 from block_dangerous_tool_usages import is_dangerous_rm_command, is_dangerous_git_command

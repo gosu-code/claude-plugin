@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit":[
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/voice_input_prompt_enhancer.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,6 +8,10 @@
     {
       "name": "gosu-mcp-core",
       "source": "./plugins/gosu-mcp-core"
+    },
+    {
+      "name": "voice-coding",
+      "source": "./plugins/voice-coding"
     }
   ]
 }

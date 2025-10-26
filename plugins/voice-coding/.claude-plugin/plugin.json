@@ -1,0 +1,11 @@
+{
+  "name": "voice-coding",
+  "description": "A plugin for enhance voice coding session with Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "Gosu Team",
+    "email": "0xgosu@gmail.com"
+  },
+  "license": "AGPL3",
+  "keywords": ["voice", "vibe-coding", "speech-to-prompt"]
+}
