@@ -1,0 +1,17 @@
+{
+  "name": "gosu-code",
+  "owner": {
+    "name": "Gosu Team",
+    "email": "0xgosu@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "gosu-mcp-core",
+      "description": "Core plugin for Gosu MCP server installation and management",
+      "version": "1.0.0",
+      "source": "./plugins/gosu-mcp-core",
+      "category": "mcp",
+      "tags": ["mcp", "installation", "docker", "github"]
+    }
+  ]
+}
