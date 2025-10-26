@@ -11,6 +11,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/task-list-md/scripts/task_list_md.py track-progress check --claude-hook",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

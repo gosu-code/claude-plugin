@@ -1,11 +1,11 @@
 {
   "name": "gosu-mcp-core",
   "description": "Core plugin for Gosu MCP server installation and management",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": {
     "name": "Gosu Team",
     "email": "0xgosu@gmail.com"
   },
   "license": "AGPL3",
-  "keywords": ["mcp", "installation", "docker", "github", "gosu"]
+  "keywords": ["mcp", "installation", "docker", "github", "gosu", "task-list-md"]
 }
