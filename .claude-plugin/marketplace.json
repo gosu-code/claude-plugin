@@ -6,6 +6,10 @@
   },
   "plugins": [
     {
+      "name": "codex-mcp",
+      "source": "./plugins/codex-mcp"
+    },
+    {
       "name": "gosu-mcp-core",
       "source": "./plugins/gosu-mcp-core"
     },
