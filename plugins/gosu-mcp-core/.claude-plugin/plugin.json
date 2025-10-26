@@ -5,9 +5,6 @@
   "author": {
     "name": "Gosu Team"
   },
-  "commands": [
-    "./commands/install-gosu-mcp.md"
-  ],
   "license": "MIT",
   "keywords": ["mcp", "installation", "docker", "github", "gosu"]
 }
