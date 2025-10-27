@@ -1,7 +1,7 @@
 {
   "name": "voice-coding",
   "description": "A plugin for enhance voice coding session with Claude Code",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Gosu Team",
     "email": "0xgosu@gmail.com"

@@ -1676,7 +1676,7 @@ def detect_file_path_in_args(args, tasks_local_data: Optional[Dict] = None) -> t
     return detected_file_path, args
 
 
-def resolve_file_path(file_argument: str) -> str:
+def resolve_file_path(file_argument: str, is_running_as_claude_hook: bool) -> str:
     """
     Resolve the file path argument. If file_argument is empty or None,
     automatically select the task file with the most recent last_modified
@@ -1684,6 +1684,7 @@ def resolve_file_path(file_argument: str) -> str:
 
     Args:
         file_argument: The file path argument from command line
+        is_running_as_claude_hook: True indicate this CLI is being used as claude hook script
 
     Returns:
         str: The resolved file path
@@ -1694,11 +1695,13 @@ def resolve_file_path(file_argument: str) -> str:
     # If file argument is provided and not empty, use it as-is
     if file_argument and file_argument.strip():
         return file_argument.strip()
+    # Define a fail fast mechanism to be used to exit with code 0 when running as claude hook
+    failfastFunc = lambda: sys.exit(0) if is_running_as_claude_hook else None
 
     # Try to read .tasks.local.json
     tasks_local_file = ".tasks.local.json"
-
     if not os.path.exists(tasks_local_file):
+        failfastFunc()
         print(f"Error: .tasks.local.json file not found. Please provide a valid file path to a tasks.md file.", file=sys.stderr)
         sys.exit(1)
 
@@ -1706,11 +1709,13 @@ def resolve_file_path(file_argument: str) -> str:
         with open(tasks_local_file, 'r', encoding='utf-8') as f:
             tasks_data = json.load(f)
     except (json.JSONDecodeError, Exception) as e:
+        failfastFunc()
         print(f"Error: Could not read .tasks.local.json: {e}. Please provide a valid file path to a tasks.md file.", file=sys.stderr)
         sys.exit(1)
 
     # Check if the data is empty
     if not tasks_data or tasks_data == {}:
+        failfastFunc()
         print(f"Error: .tasks.local.json is empty. Please provide a valid file path to a tasks.md file.", file=sys.stderr)
         sys.exit(1)
 
@@ -1735,6 +1740,7 @@ def resolve_file_path(file_argument: str) -> str:
             continue
 
     if most_recent_file is None:
+        failfastFunc()
         print(f"Error: No valid task files found in .tasks.local.json. Please provide a valid file path to a tasks.md file.", file=sys.stderr)
         sys.exit(1)
 
@@ -1957,7 +1963,7 @@ def main():
                 sys.exit(1)
 
     # Resolve the file path (auto-select from .tasks.local.json if not provided)
-    resolved_file_path = resolve_file_path(args.file)
+    resolved_file_path = resolve_file_path(args.file, hasattr(args, 'claude_hook') and args.claude_hook)
 
     # Initialize task parser
     task_parser = TaskParser(resolved_file_path)
