@@ -10,6 +10,7 @@ The following sets of tools are available:
 | Toolset       | Description                                                                 |
 | ------------- | --------------------------------------------------------------------------- |
 | `context`     | **Strongly recommended**: Tools that provide information about the current user and operating context |
+| `projects`    | GitHub Projects related tools                                               |
 | `issues`      | GitHub Issues related tools                                                 |
 | `pull_requests` | GitHub Pull Request related tools                                         |
 | `repos`       | GitHub Repository related tools                                             |
@@ -125,6 +126,70 @@ Options are:
   - `replace_parent`: When true, replaces the sub-issue's current parent issue. Use with 'add' method only. (boolean, optional)
   - `repo`: Repository name (string, required)
   - `sub_issue_id`: The ID of the sub-issue to add. ID is not the same as issue number (number, required)
+
+</details>
+
+<details>
+
+<tool-name>Projects</summary>
+
+- **add_project_item** - Add project item
+  - `item_id`: The numeric ID of the issue or pull request to add to the project. (number, required)
+  - `item_type`: The item's type, either issue or pull_request. (string, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+
+- **delete_project_item** - Delete project item
+  - `item_id`: The internal project item ID to delete from the project (not the issue or pull request ID). (number, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+
+- **get_project** - Get project
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number (number, required)
+
+- **get_project_field** - Get project field
+  - `field_id`: The field's id. (number, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+
+- **get_project_item** - Get project item
+  - `fields`: Specific list of field IDs to include in the response (e.g. ["102589", "985201", "169875"]). If not provided, only the title field is included. (string[], optional)
+  - `item_id`: The item's ID. (number, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+
+- **list_project_fields** - List project fields
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
+  - `project_number`: The project's number. (number, required)
+
+- **list_project_items** - List project items
+  - `fields`: Specific list of field IDs to include in the response (e.g. ["102589", "985201", "169875"]). If not provided, only the title field is included. (string[], optional)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
+  - `project_number`: The project's number. (number, required)
+  - `query`: Search query to filter items (string, optional)
+
+- **list_projects** - List projects
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
+  - `query`: Filter projects by a search query (matches title and description) (string, optional)
+
+- **update_project_item** - Update project item
+  - `item_id`: The unique identifier of the project item. This is not the issue or pull request ID. (number, required)
+  - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive. (string, required)
+  - `owner_type`: Owner type (string, required)
+  - `project_number`: The project's number. (number, required)
+  - `updated_field`: Object consisting of the ID of the project field to update and the new value for the field. To clear the field, set value to null. Example: {"id": 123456, "value": "New Value"} (object, required)
 
 </details>
 
