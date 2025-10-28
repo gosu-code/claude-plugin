@@ -1,6 +1,6 @@
 ---
 name: codex-mcp
-description: MUST use Codex MCP server tool `mcp__codex__codex` and `mcp__codex__codex-reply` when you are facing one of the following scnearios, 1. another MCP tool is requested that is not available, 2. you going to run a bash command that would emit large stdout output but only a subset of that output is needed
+description: Use this `codex-mcp` skill to instruct another AI Agent to invoke a tool or execute a workflow on your behalf for the following scenario, 1.When you are requested to invoke a mcp tool that you don't have access (can use `ListMcpResourcesTool` to check) such as `context7`, `github`, `linear`, `jira`; 2.When you are requested to execute a complex workflow that require interacting with multiple mcp tools and bash CLI commands for example `github-project-create-items`, `github-project-list-items` workflows;
 ---
 # codex-mcp
 
@@ -42,3 +42,4 @@ Continue a Codex session by providing the conversation id and follow-up prompt. 
 ## Known MCP Server Tools
 
 - When `github` MCP server tool (`mcp__github`, `mcp__github__*`) is requested, see mcp-github-usage.md for detailed usage instructions. Use the information in this mcp-github-usage.md file to craft a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent can use the `github` MCP server tool exactly as intended.
+- When `context7` MCP server tool is requested, see mcp-context7-usage.md for detailed usage instructions. 

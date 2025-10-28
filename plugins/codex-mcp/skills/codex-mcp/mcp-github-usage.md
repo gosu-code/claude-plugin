@@ -1,6 +1,6 @@
 # Github MCP Server Usage
 
-This file describes how to use the GitHub MCP Server tools (`mcp__github`, `mcp__github__*`, `github` MCP) effectively when delegate GitHub related requests to the GitHub MCP Server tools via the Codex MCP skill.
+This file describes how to use the GitHub MCP Server tools (`mcp__github`, `mcp__github__*`, `github` MCP) effectively when delegate GitHub related requests to the GitHub MCP Server tools via the `codex-mcp` skill.
 
 ## Available Toolsets
 
