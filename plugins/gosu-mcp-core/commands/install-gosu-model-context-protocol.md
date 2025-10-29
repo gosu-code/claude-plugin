@@ -2,7 +2,7 @@
 allowed-tools: Bash(gh auth:*), Bash(claude mcp:*), Bash(docker run:*)
 argument-hint: [--help]
 description: Install and configure the Gosu MCP server
-model: haiku
+model: claude-haiku-4-5
 ---
 Install and configure the gosu MCP server using GitHub CLI authentication. Usage: `/install-gosu-model-context-protocol`
 User prompt: $ARGUMENTS

@@ -1,10 +1,10 @@
 ---
 name: github-pr-utils
-description: Utility scripts for GitHub pull request review comment management. Fetch bot-generated feedback (linters, security scanners, dependabot), reply to review threads programmatically, resolve conversations, and automate PR review workflows. Useful for batch processing comments, CI/CD integration, quality metrics tracking, and automated responses to bot reviewers.
+description: Utility scripts for GitHub pull request review comment management. Fetch bot-generated review feedback comments (linters, security scanners, dependabot), reply to review threads programmatically, resolve conversations, and automate PR review workflows. Useful for batch processing comments, CI/CD integration, quality metrics tracking, and automated responses to bot reviewers.
 ---
 # github-pr-utils
 
-A collection of utility scripts for managing GitHub pull request review comments, specifically designed for handling bot-generated feedback and automating review workflows.
+A collection of utility scripts for managing GitHub pull request review comments, specifically designed for handling bot-generated review feedback and automating review workflows.
 
 ## Prerequisite
 
@@ -33,7 +33,7 @@ scripts/get_pr_bot_review_comments.sh [OPTIONS] <owner> <repo> <pr_number>
 - `--exclude-resolved` - Filter out resolved review threads
 - `--exclude-outdated` - Filter out outdated review comments
 - `--include-github-user login1,login2` - Also include comments from specific GitHub users (comma-separated list)
-- `--include-diff-hunk` - Include the diff hunk context for each comment
+- `--include-diff-hunk` - Include the diff hunk context for each comment, do use this option unless explicitly asked by user.
 - `-h, --help` - Display help message
 
 #### Arguments
@@ -89,15 +89,22 @@ Returns a JSON array of review comments with the following structure:
 scripts/get_pr_bot_review_comments.sh gosu-code gosu-mcp-server 123
 ```
 
-**Fetch unresolved bot comments with diff context:**
+**Fetch unresolved bot comments:**
 ```bash
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
-  --include-diff-hunk \
   gosu-code gosu-mcp-server 123
 ```
 
-**Fetch comments from specific users:**
+**Fetch unresolved & not outdated bot comments:**
+```bash
+scripts/get_pr_bot_review_comments.sh \
+  --exclude-resolved \
+  --exclude-outdated \
+  gosu-code gosu-mcp-server 123
+```
+
+**Fetch comments from bot and also non bot users:**
 ```bash
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
@@ -141,9 +148,9 @@ scripts/reply-pr-review-comments-thread.sh [OPTIONS] <owner> <repo> <comment_id>
 #### Options
 
 **Body Input (choose one):**
-- `--body "text"` - Inline Markdown body for the reply
+- `--body "text"` - Inline Markdown body for the reply (prefer to use this unless the text is long or contain special character)
 - `--body-file path` - Read reply body from a file
-- `--stdin` - Read reply body from STDIN
+- `--stdin` - Read reply body from STDIN (not recommended to use)
 
 **Additional Options:**
 - `--thread-id id` - GraphQL thread node ID (required with `--resolve-thread`)
@@ -169,13 +176,6 @@ scripts/reply-pr-review-comments-thread.sh \
 ```bash
 scripts/reply-pr-review-comments-thread.sh \
   --body-file reply.md \
-  gosu-code gosu-mcp-server 2451122234
-```
-
-**Reply via STDIN (useful for piping):**
-```bash
-echo "Fixed as suggested." | scripts/reply-pr-review-comments-thread.sh \
-  --stdin \
   gosu-code gosu-mcp-server 2451122234
 ```
 
@@ -259,7 +259,7 @@ dependabot_comments=$(scripts/get_pr_bot_review_comments.sh \
 
 # Reply to each with specific message
 echo "$dependabot_comments" | jq -r '.[].comment.databaseId' | while read -r comment_id; do
-  echo "Dependency update approved. Will merge after CI passes." | \
+  echo "Acknowledged, Will fix this in another PR." | \
   scripts/reply-pr-review-comments-thread.sh \
     --stdin \
     gosu-code gosu-mcp-server "$comment_id"
@@ -272,7 +272,6 @@ done
 # Fetch all unresolved comments
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
-  --include-diff-hunk \
   gosu-code gosu-mcp-server 123 | \
 jq -r '.[] | "\n=== \(.threadPath):\(.threadLine) ===\n\(.comment.body)\n\nComment ID: \(.comment.databaseId)"'
 ```
