@@ -6,13 +6,10 @@ description: Utility scripts for GitHub pull request review comment management. 
 
 A collection of utility scripts for managing GitHub pull request review comments, specifically designed for handling bot-generated review feedback and automating review workflows.
 
-## Prerequisite
+## Requirements
 
-This skill requires `gh` CLI and `jq` CLI to be installed on the system. Run the following bash commands to check before proceeding:
-```bash
-gh --version
-jq --version
-```
+- `gh` CLI version 2.60+
+- `jq` CLI version 1.6+
 
 You must also be authenticated with the GitHub CLI and have access to the target repository
 

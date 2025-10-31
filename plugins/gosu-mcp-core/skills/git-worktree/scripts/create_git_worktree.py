@@ -43,7 +43,9 @@ class GitWorktreeCreator:
     def __init__(self, args):
         self.args = args
         self.main_workspace = Path.cwd()
-        self.worktree_dir: Path = Path.cwd() / 'worktree'
+        # Support a customizable worktree parent directory
+        self.worktree_parent_dir = Path(args.worktree_parent_dir or '.')
+        self.worktree_dir: Path = self.worktree_parent_dir / 'worktree'
         self.branch_name = "agent/default-branch-name"
         
     def run_command(self, cmd, cwd=None, check=True):
@@ -139,8 +141,8 @@ class GitWorktreeCreator:
             self.branch_name = self.make_branch_unique(self.branch_name)
             logger.info(f"Using branch name: {self.branch_name}")
             
-            # Find unique worktree path
-            base_worktree_path = "/workspaces/worktree-agent-no1"
+            # Find unique worktree path (now using self.worktree_parent_dir)
+            base_worktree_path = str(self.worktree_parent_dir / "worktree-agent-no1")
             worktree_dir = self.find_unique_worktree_path(base_worktree_path)
             if not worktree_dir:
                 raise Exception("Failed to find a unique worktree path.")
@@ -167,6 +169,7 @@ class GitWorktreeCreator:
         """
         names_to_copy = {
             'node_modules',
+            '.pnpm-store',
             '.env',
             'go.work',
             'go.work.sum',
@@ -416,6 +419,10 @@ def main():
     parser.set_defaults(copy_modified=False)
     parser.add_argument('--copy-untracked', dest='copy_untracked', action='store_true', help='copy untracked files in worktree')
     parser.set_defaults(copy_untracked=False)
+    # Add new argument for worktree parent directory
+    parser.add_argument('--worktree-parent-dir',
+        default=str(Path.cwd().parent), 
+        help='Parent directory in which to place the worktree (default: parent of current directory)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     args = parser.parse_args()
     if args.verbose:
