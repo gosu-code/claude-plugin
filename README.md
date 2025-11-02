@@ -88,26 +88,39 @@ Enhances voice coding sessions with intelligent prompt processing for natural sp
 ## Usage Examples
 
 ### Using Task List Management
-
-Track your development tasks with hierarchical markdown checklists:
+**Use script as CLI manual tool**
+You can use the `task_list_md.py` script manually to manage tasks in markdown files by create a symbolic link to the script as follows:
+```bash
+sudo ln -s ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py /usr/local/bin/task_list_md.py
+```
+Now you can invoke the script from anywhere with `task_list_md.py` command. For example, To track your development tasks with hierarchical markdown checklists:
 
 ```bash
 # List all tasks
-python3 scripts/task_list_md.py list-tasks tasks.md
+task_list_md.py list-tasks tasks.md
 
 # Add a new task
-python3 scripts/task_list_md.py add-task tasks.md 1.1 "Implement user authentication"
+task_list_md.py add-task tasks.md 1.1 "Implement user authentication"
 
 # Update task status
-python3 scripts/task_list_md.py set-status tasks.md 1.1 in-progress
+task_list_md.py set-status tasks.md 1.1 in-progress
 
 # Get next actionable task
-python3 scripts/task_list_md.py get-next-task tasks.md
+task_list_md.py get-next-task tasks.md
+```
+**Use skill within Claude Code**
+You can also use the `task-list-md` skill within Claude Code to manage your tasks directly from the chat interface.For example:
+
+```
+Use skill to:
+- add a new task "Implement user authentication" in tasks.md which depends on task 1.1
+- add a new subtask "Design login page" under task 3 in tasks.md
+- list all tasks in tasks.md
 ```
 
 ### Running Code Reviews
 
-Ask Claude to review your code and the gosu-code-reviewer agent will automatically analyze it:
+Ask Claude Code to review your code and the gosu-code-reviewer agent will automatically analyze it:
 
 ```
 Review my TypeScript service class in src/services/user.service.ts for best practices
@@ -115,28 +128,19 @@ Review my TypeScript service class in src/services/user.service.ts for best prac
 
 ### Managing GitHub PR Comments
 
-Fetch and respond to bot-generated review comments:
+Ask Claude Code to Fetch and analyse bot-generated review comments using the `github-pr-utils` skill:
 
-```bash
-# Get all unresolved bot comments
-scripts/get_pr_bot_review_comments.sh --exclude-resolved owner repo 123
-
-# Reply to a specific comment
-scripts/reply-pr-review-comments-thread.sh \
-  --body "Fixed in latest commit" \
-  owner repo 2451122234
+```
+Use skill to fetch and analyze GitHub PR #42 comments for bot-generated feedback.
+Then for each comment that you disagree with, reply with a polite explanation and resolve the comment.
 ```
 
 ### Creating Git Worktrees
 
-Set up isolated development environments:
+Ask Claude Code to quickly create an isolated worktree environment for a new feature branch:
 
-```bash
-# Create worktree with auto-generated branch name
-python3 scripts/create_git_worktree.py feature add user auth --copy-untracked
-
-# Create with explicit branch
-python3 scripts/create_git_worktree.py --branch feat/fix-login --copy-modified
+```
+Use skill to create git worktree for branch feature/new-api and open it in a new Code editor window
 ```
 
 ## Troubleshooting
@@ -174,11 +178,13 @@ If specialized agents don't activate:
 
 ### Task List CLI Issues
 
-**Command not found**
-- Use full path: `python3 path/to/scripts/task_list_md.py`
+**Script not found or not able to run**
+- Find the script `task_list_md.py` under `~/.claude/plugins/` directory (the plugin may be installed under a different path/name based on your setup)
+- Ensure the script has execute permissions: `chmod +x path/to/task_list_md.py`
+- Create a symbolic link to the script in a directory included in your system PATH
 - Ensure Python 3.x is installed
 
-**File not found errors**
+**Task file not found errors**
 - Verify the markdown file path exists
 - Check `.tasks.local.json` is writable
 
