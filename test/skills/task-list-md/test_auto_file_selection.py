@@ -259,6 +259,120 @@ class TestAutoFileSelection(unittest.TestCase):
         self.assertIn(f"Auto-selected task file: {self.test_tasks1}", result.stdout)
         self.assertIn("All completion conditions are satisfied", result.stdout)
 
+    def test_auto_selection_excludes_non_existent_files(self):
+        """Test that auto-selection excludes non-existent files from .tasks.local.json"""
+        # Create .tasks.local.json with both existent and non-existent files
+        # non_existent.md has more recent timestamp but doesn't exist
+        # tasks1.md exists but has older timestamp
+        now = datetime.now()
+        non_existent_path = str(Path(self.temp_dir) / "non_existent.md")
+
+        self.create_tasks_local_json({
+            non_existent_path: {
+                "total_tasks": 10,
+                "completed": 5,
+                "in_progress": 2,
+                "pending": 3,
+                "review": 0,
+                "deferred": 0,
+                "percentage": 50.0,
+                "last_modified": now.isoformat(),  # More recent
+                "tasks": {}
+            },
+            str(self.test_tasks1): {
+                "total_tasks": 3,
+                "completed": 1,
+                "in_progress": 0,
+                "pending": 2,
+                "review": 0,
+                "deferred": 0,
+                "percentage": 33.33,
+                "last_modified": (now - timedelta(hours=2)).isoformat(),  # Older
+                "tasks": {}
+            }
+        })
+
+        # Run command without file argument
+        result = self.run_command("list-tasks")
+
+        # Should auto-select tasks1.md (existing file) and skip non_existent.md
+        self.assertIn(f"Auto-selected task file: {self.test_tasks1}", result.stdout)
+        self.assertNotIn(non_existent_path, result.stdout)
+        # Should display content from simple_tasks fixture (tasks1)
+        self.assertIn("Completed task", result.stdout)
+
+    def test_auto_selection_error_when_all_files_non_existent(self):
+        """Test error when all files in .tasks.local.json don't exist on filesystem"""
+        # Create .tasks.local.json with only non-existent files
+        now = datetime.now()
+        non_existent_path1 = str(Path(self.temp_dir) / "non_existent1.md")
+        non_existent_path2 = str(Path(self.temp_dir) / "non_existent2.md")
+
+        self.create_tasks_local_json({
+            non_existent_path1: {
+                "total_tasks": 5,
+                "completed": 2,
+                "in_progress": 1,
+                "pending": 2,
+                "review": 0,
+                "deferred": 0,
+                "percentage": 40.0,
+                "last_modified": now.isoformat(),
+                "tasks": {}
+            },
+            non_existent_path2: {
+                "total_tasks": 3,
+                "completed": 1,
+                "in_progress": 0,
+                "pending": 2,
+                "review": 0,
+                "deferred": 0,
+                "percentage": 33.33,
+                "last_modified": (now - timedelta(hours=1)).isoformat(),
+                "tasks": {}
+            }
+        })
+
+        # Run command without file argument
+        result = self.run_command("list-tasks", expect_success=False)
+
+        # Should fail with appropriate error message
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("No valid task files found in .tasks.local.json", result.stderr)
+        self.assertIn("Please provide a valid file path to a tasks.md file", result.stderr)
+
+    def test_auto_selection_with_mix_of_existent_and_non_existent_files(self):
+        """Test auto-selection correctly picks most recent existent file when mix exists"""
+        # Create .tasks.local.json with multiple files, some exist, some don't
+        now = datetime.now()
+        non_existent_path = str(Path(self.temp_dir) / "non_existent.md")
+
+        self.create_tasks_local_json({
+            non_existent_path: {
+                "total_tasks": 10,
+                "last_modified": now.isoformat(),  # Most recent but doesn't exist
+                "tasks": {}
+            },
+            str(self.test_tasks2): {
+                "total_tasks": 5,
+                "last_modified": (now - timedelta(hours=1)).isoformat(),  # Second most recent, exists
+                "tasks": {}
+            },
+            str(self.test_tasks1): {
+                "total_tasks": 3,
+                "last_modified": (now - timedelta(hours=3)).isoformat(),  # Oldest, exists
+                "tasks": {}
+            }
+        })
+
+        # Run command without file argument
+        result = self.run_command("list-tasks")
+
+        # Should auto-select tasks2.md (most recent existent file)
+        self.assertIn(f"Auto-selected task file: {self.test_tasks2}", result.stdout)
+        # Should display content from complex_tasks fixture (tasks2)
+        self.assertIn("Setup phase", result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

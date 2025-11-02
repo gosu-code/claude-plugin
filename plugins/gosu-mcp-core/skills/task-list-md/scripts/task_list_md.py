@@ -1727,6 +1727,10 @@ def resolve_file_path(file_argument: str, is_running_as_claude_hook: bool) -> st
         if not isinstance(file_data, dict) or 'last_modified' not in file_data:
             continue
 
+        # Skip files that don't exist on the filesystem
+        if not os.path.exists(file_path):
+            continue
+
         try:
             timestamp_str = file_data['last_modified']
             # Parse ISO format timestamp
