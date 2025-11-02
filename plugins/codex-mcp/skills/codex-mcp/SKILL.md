@@ -42,4 +42,5 @@ Continue a Codex session by providing the conversation id and follow-up prompt. 
 ## Known MCP Server Tools
 
 - When `github` MCP server tool (`mcp__github`, `mcp__github__*`) is requested, see mcp-github-usage.md for detailed usage instructions. Use the information in this mcp-github-usage.md file to craft a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent can use the `github` MCP server tool exactly as intended.
+- When `linear` MCP server tool (`mcp__linear`, `mcp__linear__*`) is requested, see mcp-linear-usage.md for detailed usage instructions. Use the guidance in mcp-linear-usage.md to compose precise prompts when delegating via `mcp__codex__codex` so the downstream agent invokes Linear tools correctly.
 - When `context7` MCP server tool is requested, see mcp-context7-usage.md for detailed usage instructions. 
