@@ -132,14 +132,14 @@ scripts/get_pr_bot_review_comments.sh gosu-code gosu-mcp-server 123 | \
 
 ---
 
-### 2. reply-pr-review-comments-thread.sh
+### 2. reply_pr_review_comments_thread.sh
 
 Reply to an existing pull request review comment thread using the GitHub REST API.
 
 #### Usage
 
 ```bash
-scripts/reply-pr-review-comments-thread.sh [OPTIONS] <owner> <repo> <comment_id>
+scripts/reply_pr_review_comments_thread.sh [OPTIONS] <owner> <repo> <comment_id>
 ```
 
 #### Options
@@ -164,34 +164,34 @@ scripts/reply-pr-review-comments-thread.sh [OPTIONS] <owner> <repo> <comment_id>
 
 **Reply with inline text:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Thanks for catching that! Fixed in the latest commit." \
   gosu-code gosu-mcp-server 2451122234
 ```
 
 **Reply from a file:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body-file reply.md \
   gosu-code gosu-mcp-server 2451122234
 ```
 
 **Compose reply in editor:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   gosu-code gosu-mcp-server 2451122234
 ```
 
 **Reply with confirmation prompt:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Updated the implementation." \
   gosu-code gosu-mcp-server 2451122234
 ```
 
 **Reply and resolve the thread:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Done! Resolving this thread." \
   --thread-id PRRT_kwDODds1es5e2SRi \
   --resolve-thread \
@@ -200,7 +200,7 @@ scripts/reply-pr-review-comments-thread.sh \
 
 **Dry run to preview:**
 ```bash
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Test reply" \
   gosu-code gosu-mcp-server 2451122234
 ```
@@ -322,7 +322,7 @@ comments=$(scripts/get_pr_bot_review_comments.sh \
 
 # Loop through and reply to each
 echo "$comments" | jq -r '.[].comment.databaseId' | while read -r comment_id; do
-  scripts/reply-pr-review-comments-thread.sh \
+  scripts/reply_pr_review_comments_thread.sh \
     --body "Addressed in latest commit." \
     gosu-code gosu-mcp-server "$comment_id"
 done
@@ -353,7 +353,7 @@ dependabot_comments=$(scripts/get_pr_bot_review_comments.sh \
 # Reply to each with specific message
 echo "$dependabot_comments" | jq -r '.[].comment.databaseId' | while read -r comment_id; do
   echo "Acknowledged, Will fix this in another PR." | \
-  scripts/reply-pr-review-comments-thread.sh \
+  scripts/reply_pr_review_comments_thread.sh \
     --stdin \
     gosu-code gosu-mcp-server "$comment_id"
 done

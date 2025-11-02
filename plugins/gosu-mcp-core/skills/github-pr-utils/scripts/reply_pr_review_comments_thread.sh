@@ -24,7 +24,7 @@ usage() {
 Reply to an existing pull request review comment thread using the GitHub CLI.
 
 Usage:
-  scripts/reply-pr-review-comments-thread.sh [options] <owner> <repo> <comment_id>
+  scripts/reply_pr_review_comments_thread.sh [options] <owner> <repo> <comment_id>
 
   <comment_id> may be either the numeric database ID or the GraphQL node ID (e.g. PRRC_*).
 
@@ -40,11 +40,11 @@ Options:
   -h, --help               Show this help message.
 
 Examples:
-  scripts/reply-pr-review-comments-thread.sh \\
+  scripts/reply_pr_review_comments_thread.sh \\
     --body "Thanks for catching that! Updated the pre-flight check." \\
     theunigroup utx 2451122234
 
-  scripts/reply-pr-review-comments-thread.sh \\
+  scripts/reply_pr_review_comments_thread.sh \\
     --body-file reply.md --confirm --thread-id PRRT_kwDODds1es5e2SRi --resolve-thread \\
     theunigroup utx 2451122234
 

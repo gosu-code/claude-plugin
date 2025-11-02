@@ -212,12 +212,12 @@ scripts/get_pr_bot_review_comments.sh \
   owner repo 123
 
 # Reply to a comment
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Fixed in latest commit" \
   owner repo 2451122234
 
 # Reply and resolve thread
-scripts/reply-pr-review-comments-thread.sh \
+scripts/reply_pr_review_comments_thread.sh \
   --body "Done!" \
   --thread-id PRRT_kwDODds1es5e2SRi \
   --resolve-thread \
@@ -364,7 +364,7 @@ scripts/get_pr_bot_review_comments.sh \
 
 # Process each comment
 cat bot_comments.json | jq -r '.[].comment.databaseId' | while read id; do
-  scripts/reply-pr-review-comments-thread.sh \
+  scripts/reply_pr_review_comments_thread.sh \
     --body "Addressed in commit abc123" \
     gosu-code gosu-mcp-server "$id"
 done

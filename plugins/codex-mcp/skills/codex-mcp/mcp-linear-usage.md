@@ -85,6 +85,45 @@ The following sets of tools are available:
 - **list_issue_statuses** - Return the full set of workflow statuses for a team
   - `team`: Team key or ID whose statuses to fetch (string, required)
 
+- **create_issue** - Open a new Linear issue scoped to a particular team
+  - `team`: Team key, name, or ID that owns the issue (string, required)
+  - `title`: Issue title rendered in Linear (string, required)
+  - `assignee`: Assign to a user by ID, name, email, or `me` (string, optional)
+  - `cycle`: Cycle name or ID such as `current` (string, optional)
+  - `delegate`: Agent or teammate responsible for follow-up (string, optional)
+  - `description`: Markdown body content (string, optional)
+  - `dueDate`: ISO-8601 due date (string, optional)
+  - `labels`: Array of label names or IDs (array of strings, optional)
+  - `links`: Related resource links, each with `title` and `url` (array of objects, optional)
+  - `parentId`: Parent issue ID when creating a sub-issue (string, optional)
+  - `priority`: Priority level 0–4; avoid setting unless requested (number, optional)
+  - `project`: Project name or ID to associate (string, optional)
+  - `state`: Workflow state ID or name (string, optional)
+
+- **create_issue_label** - Define a new label for issues at workspace or team scope
+  - `name`: Label display name (string, required)
+  - `color`: Hex color code (string, optional)
+  - `description`: Help text describing the label (string, optional)
+  - `isGroup`: Mark as a label group that cannot be applied directly (boolean, optional)
+  - `parentId`: Parent label ID when nesting labels (string, optional)
+  - `teamId`: Team ID if creating a team-scoped label (string, optional)
+
+- **update_issue** - Modify fields on an existing Linear issue
+  - `id`: Issue ID to mutate (string, required)
+  - `assignee`: Update assignee by ID, name, email, or `me` (string, optional)
+  - `cycle`: Adjust cycle membership (string, optional)
+  - `delegate`: Change the delegated agent or teammate (string, optional)
+  - `description`: Replace issue description markdown (string, optional)
+  - `dueDate`: Update due date (string, optional)
+  - `estimate`: Set or change effort estimate (number, optional)
+  - `labels`: Complete replacement list of label names or IDs (array of strings, optional)
+  - `links`: Replace linked resources array (array of objects, optional)
+  - `parentId`: Reassign parent issue (string, optional)
+  - `priority`: Priority level 0–4; avoid changing unless requested (number, optional)
+  - `project`: Associate with a different project (string, optional)
+  - `state`: New workflow state ID or name (string, optional)
+  - `title`: Update the issue title (string, optional)
+
 - **create_comment** - Create a Markdown comment on a Linear issue and optionally nest it under an existing comment
   - `body`: Markdown payload rendered inside the Linear issue thread (string, required)
   - `issueId`: Linear issue identifier receiving the comment (string, required)
@@ -122,6 +161,30 @@ The following sets of tools are available:
   - `limit`: Results per page (max 250) (number, optional)
   - `name`: Case-insensitive name match (string, optional)
   - `orderBy`: Sort order field (string, optional)
+
+- **create_project** - Initialize a new Linear project with optional metadata
+  - `team`: Team name or ID that owns the project (string, required)
+  - `name`: Project title (string, required)
+  - `description`: Markdown project description (string, optional)
+  - `labels`: Labels to apply by name or ID (array of strings, optional)
+  - `lead`: Project lead user identifier (string, optional)
+  - `priority`: Priority 0–4; omit unless the user specifies (number, optional)
+  - `startDate`: ISO-8601 start date (string, optional)
+  - `state`: Project state name or ID (string, optional)
+  - `summary`: Short plaintext summary (string, optional)
+  - `targetDate`: ISO-8601 target completion date (string, optional)
+
+- **update_project** - Modify an existing project and its metadata
+  - `id`: Project ID to update (string, required)
+  - `name`: New project title (string, optional)
+  - `description`: Markdown description replacement (string, optional)
+  - `labels`: Complete replacement list of labels by name or ID (array of strings, optional)
+  - `lead`: Update project lead (string, optional)
+  - `priority`: Priority 0–4; only set when explicitly requested (number, optional)
+  - `startDate`: Adjust start date (string, optional)
+  - `state`: New project state name or ID (string, optional)
+  - `summary`: Update plaintext summary (string, optional)
+  - `targetDate`: Adjust target completion date (string, optional)
 
 </details>
 
