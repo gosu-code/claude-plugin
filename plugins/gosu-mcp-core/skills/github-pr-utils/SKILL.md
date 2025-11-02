@@ -1,10 +1,10 @@
 ---
 name: github-pr-utils
-description: Utility scripts for GitHub pull request review comment management. Fetch bot-generated review feedback comments (linters, security scanners, dependabot), reply to review threads programmatically, resolve conversations, and automate PR review workflows. Useful for batch processing comments, CI/CD integration, quality metrics tracking, and automated responses to bot reviewers.
+description: Utility scripts for GitHub pull request management. Includes tools for fetching bot-generated review comments (linters, security scanners, dependabot), replying to review threads programmatically, listing merged pull requests with filtering, resolving conversations, and automating PR review workflows. Useful for batch processing comments, CI/CD integration, quality metrics tracking, release notes generation, and automated responses to bot reviewers.
 ---
 # github-pr-utils
 
-A collection of utility scripts for managing GitHub pull request review comments, specifically designed for handling bot-generated review feedback and automating review workflows.
+A collection of utility scripts for managing GitHub pull requests, including review comment management, merged PR tracking, and automated workflows. These scripts are designed for handling bot-generated review feedback, generating release notes, and automating PR review workflows.
 
 ## Requirements
 
@@ -211,6 +211,102 @@ scripts/reply-pr-review-comments-thread.sh \
 2. **Batch Processing**: Loop through multiple comments and reply to each
 3. **CI/CD Integration**: Post automated updates from build/test pipelines
 4. **Thread Resolution**: Reply and resolve threads in a single operation
+
+---
+
+### 3. list_merged_pr.sh
+
+List merged pull requests with optional filtering by authors and date range. Supports saving PR details to individual markdown files for documentation or release notes.
+
+#### Usage
+
+```bash
+scripts/list_merged_pr.sh [OPTIONS]
+```
+
+#### Options
+
+**Filtering Options:**
+- `-a, --authors USERS` - Comma-separated list of GitHub usernames to filter by
+- `-f, --from DATE` - Start date for PR merge filter (YYYY-MM-DD format)
+- `-t, --to DATE` - End date for PR merge filter (YYYY-MM-DD format)
+- `-d, --days DAYS` - Number of days to look back (alternative to --from), default: 7
+- `-r, --repo REPO` - GitHub repository in format "owner/repo", default: current repository
+
+**Output Options:**
+- `-s, --save [DIR]` - Save PR details to files (one file per PR), optional directory path, default: ./out
+- `-h, --help` - Display help message
+
+#### Output
+
+**Console Output:**
+Displays a tab-separated list of PRs with: PR number, title (truncated to 120 chars), author, merge date, and URL.
+
+**File Output (with `--save`):**
+Creates one markdown file per PR with the format `PR-{number}-{title}.md` containing:
+- PR metadata (author, merge date, URL)
+- Full PR description
+- List of commits with authors and messages
+- Generation timestamp
+
+#### Examples
+
+**List all merged PRs from last 7 days (default):**
+```bash
+scripts/list_merged_pr.sh
+```
+
+**List merged PRs from specific authors:**
+```bash
+scripts/list_merged_pr.sh --authors "john,jane,bob"
+```
+
+**List merged PRs from last 30 days:**
+```bash
+scripts/list_merged_pr.sh --days 30
+```
+
+**List merged PRs within a specific date range:**
+```bash
+scripts/list_merged_pr.sh --from "2025-10-01" --to "2025-10-31"
+```
+
+**Combine filters: specific authors and date range:**
+```bash
+scripts/list_merged_pr.sh --authors "john,jane" --from "2025-10-01" --to "2025-10-31"
+```
+
+**Query a specific repository:**
+```bash
+scripts/list_merged_pr.sh --repo "owner/repo" --days 30
+```
+
+**Save PR details to files in ./out directory:**
+```bash
+scripts/list_merged_pr.sh --save
+```
+
+**Save PR details to custom directory:**
+```bash
+scripts/list_merged_pr.sh --save /path/to/output --days 30
+```
+
+**Process with jq:**
+```bash
+# Count merged PRs
+scripts/list_merged_pr.sh --days 30 | wc -l
+
+# Extract just PR numbers
+scripts/list_merged_pr.sh | cut -f1 | sed 's/#//'
+```
+
+#### Common Use Cases
+
+1. **Release Notes Generation**: Save PRs from a release period to markdown files for changelog creation
+2. **Team Activity Tracking**: Filter by team member usernames to track contributions
+3. **Sprint Reports**: Query PRs merged during a sprint date range
+4. **Quality Metrics**: Analyze merge patterns and PR velocity over time
+5. **Documentation**: Generate detailed PR summaries with full context for auditing
 
 ---
 
