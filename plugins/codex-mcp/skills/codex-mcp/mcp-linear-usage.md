@@ -239,7 +239,7 @@ The following sets of tools are available:
 When working with list operations (`list_issues`, `list_documents`, `list_projects`, `list_teams`), follow this adaptive pagination strategy to efficiently retrieve all results:
 
 ### Initial Request
-- **Always start with `limit: 10`** for the first page of results
+- **Always start with `limit: 4`** for the first page of results
 - This conservative default ensures fast response times and reduces likelihood of truncation
 
 ### Handling Truncated Responses
@@ -262,11 +262,11 @@ When the MCP server returns a truncated response (indicated by the presence of p
 
 ### Example Flow
 ```
-Request 1: limit=10  → Response: 10 items, truncated
-Request 2: limit=10, after=<last_id> → Response: 10 items, not truncated
-Request 3: limit=20, after=<last_id> → Response: 20 items, not truncated
-Request 4: limit=40, after=<last_id> → Response: 40 items, not truncated
-Request 5: limit=80, after=<last_id> → Response: 15 items, truncated
+Request 1: limit=4  → Response: 4 items, truncated
+Request 2: limit=4, after=<last_id> → Response: 4 items, not truncated
+Request 3: limit=8, after=<last_id> → Response: 8 items, not truncated
+Request 4: limit=16, after=<last_id> → Response: 16 items, not truncated
+Request 5: limit=32, after=<last_id> → Response: 10 items, truncated
 Request 6: limit=1, after=<last_id>  → Response: 1 item, not truncated
 Request 7: limit=2, after=<last_id>  → Response: 2 items, not truncated
 ... (continue doubling until complete)
