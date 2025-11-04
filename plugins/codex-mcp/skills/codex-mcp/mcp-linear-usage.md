@@ -234,6 +234,50 @@ The following sets of tools are available:
 - List-style tools expose `after`/`before` identifiers for cursor-based pagination. Supply them exactly as returned in previous responses.
 - Unless otherwise called out, tools return the same shapes as Linear's GraphQL API. Inspect responses in a dev session to discover all available fields.
 
+## Pagination Strategy
+
+When working with list operations (`list_issues`, `list_documents`, `list_projects`, `list_teams`), follow this adaptive pagination strategy to efficiently retrieve all results:
+
+### Initial Request
+- **Always start with `limit: 10`** for the first page of results
+- This conservative default ensures fast response times and reduces likelihood of truncation
+
+### Handling Truncated Responses
+When the MCP server returns a truncated response (indicated by the presence of pagination cursors or incomplete result sets):
+
+1. **Immediate Retry**: Make another request with:
+   - Same `limit` value
+   - `after` parameter set to the **last object ID** from the previous response
+   - Continue until the response is no longer truncated
+
+2. **Adaptive Limit Adjustment** (for subsequent paginated calls):
+   - If responses are **not truncated**, gradually increase `limit` by doubling: `1 → 2 → 4 → 8 → 16 → ...`
+   - This optimization reduces the number of round trips for large datasets
+   - Maximum practical limit: 250 (Linear API constraint)
+
+3. **Truncation Recovery**:
+   - If a truncated response appears again after increasing the limit, **immediately reset `limit` back to 1**
+   - This ensures you can continue paginating through challenging result sets
+   - Resume gradual doubling once responses stabilize
+
+### Example Flow
+```
+Request 1: limit=10  → Response: 10 items, truncated
+Request 2: limit=10, after=<last_id> → Response: 10 items, not truncated
+Request 3: limit=20, after=<last_id> → Response: 20 items, not truncated
+Request 4: limit=40, after=<last_id> → Response: 40 items, not truncated
+Request 5: limit=80, after=<last_id> → Response: 15 items, truncated
+Request 6: limit=1, after=<last_id>  → Response: 1 item, not truncated
+Request 7: limit=2, after=<last_id>  → Response: 2 items, not truncated
+... (continue doubling until complete)
+```
+
+### Best Practices
+- Always extract and use the exact pagination cursor (`after`/`before`) returned by the API
+- Track the current `limit` value across pagination iterations
+- Monitor response sizes and truncation signals to trigger limit adjustments
+- For known large datasets, consider starting with a higher limit (e.g., 50-100) after initial exploration
+
 ## Implementation Tips
 
 - Capture IDs from list responses and cache them when orchestrating multi-step flows; many tools expect those IDs directly.
