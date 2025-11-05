@@ -17,7 +17,7 @@ Run a Codex session. Accepts configuration parameters matching the Codex Config 
 | **`prompt`** (required) | string | Initial user prompt that seeds the Codex conversation.                                                                                                 |
 | `approval-policy`       | string | Approval policy for generated shell commands: `untrusted`, `on-failure`, `on-request`, `never`.                                                        |
 | `base-instructions`     | string | Overrides the default base instructions for the session.                                                                                               |
-| `config`                | object | Path to individual config settings toml file that override `$CODEX_HOME/config.toml` (see codex-config-toml-structure.md to understand how to create this file).                 |
+| `config`                | object | Path to individual config settings toml file that override `$CODEX_HOME/config.toml` (see [codex-config-toml-structure.md](codex-config-toml-structure.md) to understand how to create this file).                 |
 | `cwd`                   | string | Working directory for the session. Relative paths resolve from the server process root.                                                                |
 | `model`                 | string | Optional override for the model name (e.g., `gpt-5`, `o4-mini`) default is `gpt-5-codex`.                                                                                       |
 | `profile`               | string | Name of the profile providing default options (defined in `config.toml`).                                                                                           |
@@ -41,6 +41,6 @@ Continue a Codex session by providing the conversation id and follow-up prompt. 
 
 ## Known MCP Server Tools
 
-- When `github` MCP server tool (`mcp__github`, `mcp__github__*`) is requested, see mcp-github-usage.md for detailed usage instructions. Use the information in this mcp-github-usage.md file to craft a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent can use the `github` MCP server tool exactly as intended.
-- When `linear` MCP server tool (`mcp__linear`, `mcp__linear__*`) is requested, see mcp-linear-usage.md for detailed usage instructions. Use the guidance in mcp-linear-usage.md to compose precise prompts when delegating via `mcp__codex__codex` so the downstream agent invokes Linear tools correctly.
-- When `context7` MCP server tool is requested, see mcp-context7-usage.md for detailed usage instructions. 
+- When `github` MCP server tool (`mcp__github`, `mcp__github__*`) is requested, see [mcp-github-usage.md](mcp-github-usage.md) for detailed usage instructions. Use the information in this file to craft a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent can use the `github` MCP server tool exactly as intended.
+- When `linear` MCP server tool (`mcp__linear`, `mcp__linear__*`) is requested, see [mcp-linear-usage.md](mcp-linear-usage.md) for detailed usage instructions. Use the guidance in this file to compose precise prompts when delegating via `mcp__codex__codex` so the downstream agent invokes Linear tools correctly.
+- When `context7` MCP server tool is requested, see [mcp-context7-usage.md](mcp-context7-usage.md) for detailed usage instructions. 
