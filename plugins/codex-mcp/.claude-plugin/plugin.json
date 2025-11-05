@@ -1,7 +1,7 @@
 {
   "name": "codex-mcp",
   "description": "A plugin to integrate Codex CLI as a companion AI Agent to Claude Code via MCP server",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": {
     "name": "Gosu Team",
     "email": "0xgosu@gmail.com"
