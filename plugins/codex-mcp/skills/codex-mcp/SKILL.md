@@ -4,7 +4,7 @@ description: Use this `codex-mcp` skill to instruct another AI Agent to invoke a
 ---
 # codex-mcp
 
-You MUST check whether `codex` CLI is available in the current bash environment with this bash command: `codex --version`. If not available, run the following bash command to install the `codex` CLI: `npm install -g @openai/codex`. Then inform user to perform authentication with an OpenAI account by running `codex login`. Ignore this instruction if the CLI is already available.
+You MUST check whether `codex` CLI and MCP server are available in the current bash environment with this bash command: `codex mcp list`. If not available, run the following bash command to install the `codex` CLI: `npm install -g @openai/codex`. Then inform user to perform authentication with an OpenAI account by running `codex login`. Ignore this instruction if the CLI is already available.
 
 ## Tools
 

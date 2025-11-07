@@ -226,7 +226,7 @@ Relative paths resolve from the server process root.
 
 **Solutions:**
 1. Install Codex CLI: `npm install -g @openai/codex`
-2. Verify installation: `codex --version`
+2. Verify installation: `codex mcp list`
 3. Check npm global bin path is in PATH
 4. Restart terminal/shell after installation
 
@@ -245,7 +245,7 @@ Relative paths resolve from the server process root.
 **Problem:** Codex MCP server shows as disconnected
 
 **Solutions:**
-1. Verify Codex CLI is installed: `codex --version`
+1. Verify Codex CLI is installed and MCP server is available: `codex mcp list`
 2. Check authentication: `codex login`
 3. Restart Claude Code
 4. Verify MCP server list: `claude mcp list`
