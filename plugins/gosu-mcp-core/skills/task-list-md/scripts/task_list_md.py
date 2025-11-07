@@ -450,6 +450,24 @@ class ProgressTracker:
             logging.warning(f"Unexpected error in detect_infinite_loop: {e}")
             return True
 
+    def output_claude_hook_response(self, block: bool, reason: str = ""):
+        """Output JSON response for Claude hook mode
+
+        Args:
+            block: If True, output decision="block" to prevent Claude from stopping.
+                   If False, omit decision key to allow Claude to stop.
+            reason: Reason message. Required when block=True, ignored when block=False.
+        """
+        response = {}
+        if block:
+            response["decision"] = "block"
+            response["reason"] = reason
+        else:
+            response["reason"] = ""
+
+        print(json.dumps(response))
+        sys.stdout.flush()
+
 
 class TaskParser:
     def __init__(self, file_path: str):
@@ -2041,7 +2059,9 @@ def main():
 
         elif args.track_command == 'check':
             # Handle Claude hook mode (switch the exit_code if detect infinite hook situation)
-            if hasattr(args, 'claude_hook') and args.claude_hook:
+            is_claude_hook_mode = hasattr(args, 'claude_hook') and args.claude_hook
+
+            if is_claude_hook_mode:
                 # Use exit code 1 if in Claude hook mode to prevent infinite loop
                 # Use exit code 2 will make Claude continue and not stopping if hook is enabled
                 hook_input = task_parser.progress_tracker.read_claude_hook_input()
@@ -2054,10 +2074,14 @@ def main():
                         if task_parser.progress_tracker.detect_infinite_loop(transcript_path):
                             # Use exit code 1 to prevent infinite loop
                             print("Infinite loop detected in Claude hook. Exiting to prevent further execution.", file=sys.stderr)
+                            # Output JSON response for Claude hook (allow Claude to stop)
+                            task_parser.progress_tracker.output_claude_hook_response(block=False)
                             sys.exit(1)
                     else:
                         # No transcript path, use exit code 1 to be safe
                         print("No transcript path provided in Claude hook. Exiting to prevent potential infinite loop.", file=sys.stderr)
+                        # Output JSON response for Claude hook (allow Claude to stop)
+                        task_parser.progress_tracker.output_claude_hook_response(block=False)
                         sys.exit(1)
 
             # Proceed with normal tracking condition check
@@ -2066,25 +2090,38 @@ def main():
             )
 
             if unmet_conditions:
-                print("Completion conditions not met:", file=sys.stderr)
+                # Build detailed reason message for Claude
+                reason_parts = ["Completion conditions not met:"]
                 for i, unmet in enumerate(unmet_conditions, 1):
                     condition = unmet['condition']
-                    print(f"\nCondition {i}:", file=sys.stderr)
-                    print(f"  Required tasks: {', '.join(condition['tasks_to_complete'])}", file=sys.stderr)
+                    reason_parts.append(f"\nCondition {i}:")
+                    reason_parts.append(f"  Required tasks: {', '.join(condition['tasks_to_complete'])}")
 
                     if unmet['unmet_tasks']:
-                        print("  Issues:", file=sys.stderr)
+                        reason_parts.append("  Issues:")
                         for issue in unmet['unmet_tasks']:
-                            print(f"    - {issue}", file=sys.stderr)
+                            reason_parts.append(f"    - {issue}")
 
                     if unmet['total_count_issue']:
-                        print(f"  Total count issue: {unmet['total_count_issue']}", file=sys.stderr)
-                if hasattr(args, 'claude_hook') and args.claude_hook:
-                    # print a message to stderr for Claude to see, so it will continue to work on the tasks
-                    print("\nIMPORTANCE: Please continue working on the remaining tasks to meet the completion conditions.", file=sys.stderr)
+                        reason_parts.append(f"  Total count issue: {unmet['total_count_issue']}")
+
+                reason_message = '\n'.join(reason_parts)
+
+                if is_claude_hook_mode:
+                    # Output JSON response for Claude hook (block Claude from stopping)
+                    reason_message += "\n\nIMPORTANCE: Please continue working on the remaining tasks to meet the completion conditions."
+                    task_parser.progress_tracker.output_claude_hook_response(block=True, reason=reason_message)
+                else:
+                    # Normal mode: print to stderr
+                    print(reason_message, file=sys.stderr)
+
                 sys.exit(2)
             else:
-                print("All completion conditions are satisfied.")
+                if is_claude_hook_mode:
+                    # Output JSON response for Claude hook (allow Claude to stop)
+                    task_parser.progress_tracker.output_claude_hook_response(block=False)
+                else:
+                    print("All completion conditions are satisfied.")
 
         elif args.track_command == 'clear':
             success = task_parser.progress_tracker.clear_tracking_conditions(

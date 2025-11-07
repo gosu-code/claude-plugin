@@ -416,6 +416,12 @@ class TestTrackProgress(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("No transcript path provided", result.stderr)
 
+        # Verify JSON response format (should allow Claude to stop)
+        response = json.loads(result.stdout.strip())
+        self.assertIn("reason", response)
+        self.assertEqual(response["reason"], "")
+        self.assertNotIn("decision", response)
+
     def test_claude_hook_with_stop_hook_active_with_transcript(self):
         """Test Claude hook mode with stop_hook_active and transcript path"""
         import subprocess
@@ -446,7 +452,12 @@ class TestTrackProgress(unittest.TestCase):
 
             # Should work normally since < 3 hook calls in transcript
             self.assertEqual(result.returncode, 0)
-            self.assertIn("All completion conditions are satisfied", result.stdout)
+
+            # Verify JSON response format (should allow Claude to stop)
+            response = json.loads(result.stdout.strip())
+            self.assertIn("reason", response)
+            self.assertEqual(response["reason"], "")
+            self.assertNotIn("decision", response)
 
         finally:
             os.unlink(transcript_path)
@@ -479,6 +490,12 @@ class TestTrackProgress(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Infinite loop detected", result.stderr)
 
+            # Verify JSON response format (should allow Claude to stop)
+            response = json.loads(result.stdout.strip())
+            self.assertIn("reason", response)
+            self.assertEqual(response["reason"], "")
+            self.assertNotIn("decision", response)
+
         finally:
             os.unlink(transcript_path)
 
@@ -502,7 +519,54 @@ class TestTrackProgress(unittest.TestCase):
 
         # Should work normally since stop_hook_active is false
         self.assertEqual(result.returncode, 0)
-        self.assertIn("All completion conditions are satisfied", result.stdout)
+
+        # Verify JSON response format (should allow Claude to stop)
+        response = json.loads(result.stdout.strip())
+        self.assertIn("reason", response)
+        self.assertEqual(response["reason"], "")
+        self.assertNotIn("decision", response)
+
+    def test_claude_hook_conditions_not_met_blocks(self):
+        """Test Claude hook mode blocks when conditions are not met"""
+        import subprocess
+        import json
+        import tempfile
+
+        # Create a mock transcript file with less than 3 hook calls
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+            f.write('{"content": "python3 scripts/task_list_md/task_list_md.py track-progress check tasks.md --claude-hook"}\n')
+            transcript_path = f.name
+
+        try:
+            # Prepare hook input with transcript_path
+            hook_input = {
+                "session_id": "test123",
+                "transcript_path": transcript_path,
+                "hook_event_name": "Stop",
+                "stop_hook_active": True
+            }
+
+            # Add a tracking condition for task 2 (which is pending/not completed)
+            self.run_command("track-progress", "add", str(self.test_tasks), "2")
+
+            cmd = ["python3", str(self.script_path), "track-progress", "check", str(self.test_tasks), "--claude-hook"]
+            result = subprocess.run(cmd, input=json.dumps(hook_input), text=True, capture_output=True)
+
+            # Should exit with code 2 (conditions not met)
+            self.assertEqual(result.returncode, 2)
+
+            # Verify JSON response format (should block Claude from stopping)
+            response = json.loads(result.stdout.strip())
+            self.assertIn("decision", response)
+            self.assertEqual(response["decision"], "block")
+            self.assertIn("reason", response)
+            self.assertNotEqual(response["reason"], "")
+            self.assertIn("Completion conditions not met", response["reason"])
+            self.assertIn("Task '2' is not completed", response["reason"])
+            self.assertIn("IMPORTANCE: Please continue working on the remaining tasks", response["reason"])
+
+        finally:
+            os.unlink(transcript_path)
 
     def test_claude_hook_regex_pattern_variations(self):
         """Test the regex pattern matches various command formats"""
