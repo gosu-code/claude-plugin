@@ -77,6 +77,7 @@ Exit Codes:
 
 import argparse
 import json
+import os
 import sys
 import re
 import shlex
@@ -393,6 +394,18 @@ def main():
              'By default, only blocks dangerous operations and exits with code 0 for safe ones.'
     )
     args = parser.parse_args()
+
+    # Allow configuration-based override for auto-allow behavior
+    config_path = os.path.join(os.getcwd(), ".gosu", "settings.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as config_file:
+                config_data = json.load(config_file)
+            if isinstance(config_data, dict) and config_data.get("autoAllowNonDangerousToolUsage") is True:
+                args.and_auto_allow = True
+        except Exception:
+            # Ignore errors reading/parsing config; fall back to CLI flag behavior
+            pass
 
     try:
         # Read JSON input from stdin

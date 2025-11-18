@@ -52,6 +52,7 @@ test_hook_decision() {
     local expected_decision="$4"
     local expected_reason_pattern="${5:-}"
     local use_auto_allow="${6:-no}"
+    local workdir="${7:-}"
 
     printf "%-60s " "Test: $test_name ..."
 
@@ -59,12 +60,20 @@ test_hook_decision() {
     local stderr_file=$(mktemp)
 
     # Run the hook with or without --and-auto-allow flag
+    local cmd=(python3 "$HOOK_SCRIPT_PATH")
     if [ "$use_auto_allow" = "yes" ]; then
-        result=$(echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
-                 python3 "$HOOK_SCRIPT_PATH" --and-auto-allow 2>"$stderr_file")
+        cmd+=("--and-auto-allow")
+    fi
+
+    if [ -n "$workdir" ]; then
+        result=$(
+            cd "$workdir" && \
+            echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
+            "${cmd[@]}" 2>"$stderr_file"
+        )
     else
         result=$(echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
-                 python3 "$HOOK_SCRIPT_PATH" 2>"$stderr_file")
+                 "${cmd[@]}" 2>"$stderr_file")
     fi
 
     # Verify valid JSON
@@ -124,13 +133,23 @@ test_hook_no_output() {
     local test_name="$1"
     local tool_name="$2"
     local tool_input="$3"
+    local workdir="${4:-}"
 
     printf "%-60s " "Test: $test_name ..."
 
     # Run the hook without --and-auto-allow flag
     set +e
-    result=$(echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
-             python3 "$HOOK_SCRIPT_PATH" 2>/dev/null)
+    local cmd=(python3 "$HOOK_SCRIPT_PATH")
+    if [ -n "$workdir" ]; then
+        result=$(
+            cd "$workdir" && \
+            echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
+            "${cmd[@]}" 2>/dev/null
+        )
+    else
+        result=$(echo "{\"tool_name\": \"$tool_name\", \"tool_input\": $tool_input}" | \
+                 "${cmd[@]}" 2>/dev/null)
+    fi
     exit_code=$?
     set -e
 
@@ -591,6 +610,43 @@ test_hook_decision \
     "allow" \
     "" \
     "yes"
+
+echo ""
+
+###############################################################################
+echo "--- Config-based Auto-Allow Tests ---"
+###############################################################################
+
+config_dir=$(mktemp -d)
+mkdir -p "$config_dir/.gosu"
+cat > "$config_dir/.gosu/settings.json" <<'EOF'
+{"autoAllowNonDangerousToolUsage": true}
+EOF
+
+test_hook_decision \
+    "Config enables auto-allow without flag" \
+    "Bash" \
+    '{"command": "git status"}' \
+    "allow" \
+    "" \
+    "no" \
+    "$config_dir"
+
+rm -rf "$config_dir"
+
+config_dir=$(mktemp -d)
+mkdir -p "$config_dir/.gosu"
+cat > "$config_dir/.gosu/settings.json" <<'EOF'
+{"autoAllowNonDangerousToolUsage": false}
+EOF
+
+test_hook_no_output \
+    "Config disabled auto-allow keeps default behavior" \
+    "Bash" \
+    '{"command": "git status"}' \
+    "$config_dir"
+
+rm -rf "$config_dir"
 
 echo ""
 

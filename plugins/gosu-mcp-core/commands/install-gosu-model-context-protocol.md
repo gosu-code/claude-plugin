@@ -26,7 +26,7 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     ```
   
   **Phase 2: Install MCP Server**
-  - Execute the MCP server installation command: `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN 0xgosu/gosu-mcp-server`
+  - Execute the MCP server installation command: `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN -v '${PWD:-.}:/server/cwd' 0xgosu/gosu-mcp-server`
   - Capture the command output and analyze the response
   - Check if the output contains one of the following success messages:
     - "MCP server gosu already exists in local config" (server already installed)

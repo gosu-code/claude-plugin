@@ -35,6 +35,7 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     - Extract the script filename
     - Get the absolute path of the source script
     - Create symlink in `/usr/local/bin/` pointing to the absolute path: `ln -sf <absolute-path> /usr/local/bin/<filename>`
+      - If failed due to user permissions, try create symlink in `~/.local/bin/` and suggest adding this directory to PATH if user has not done so
     - Ensure the source script has execute permissions: `chmod +x <absolute-path>`
   - After all symlinks are created, verify installation by listing created symlinks: `ls -la /usr/local/bin/ | grep -E '(.py|.sh)$'`
   - Display success message showing:
