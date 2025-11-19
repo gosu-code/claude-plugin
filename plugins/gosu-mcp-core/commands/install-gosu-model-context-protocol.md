@@ -33,7 +33,8 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     - "Added stdio MCP server gosu with command: docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN 0xgosu/gosu-mcp-server to local config" (new installation successful)
   - If either success message is found, verify with a follow-up command: `claude mcp list` to confirm "gosu" is listed among installed MCP servers
     - A message "gosu: docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN 0xgosu/gosu-mcp-server - ✓ Connected" confirms successful connection
-    - If "gosu" is listed with a failed status, try to run the docker command manually to diagnose connection issues: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN $(gh auth token) 0xgosu/gosu-mcp-server`
+    - If "gosu" is listed with a failed status, try to run the docker command manually to diagnose connection issues: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN $(gh auth token) -v $PWD:/server/cwd' 0xgosu/gosu-mcp-server`
+    - Try remove "-v '${PWD:-.}:/server/cwd'" from the docker command if volume mounting issues are suspected
     - Show any error messages from the manual run to help user troubleshoot
   - When a successful MCP connection is confirmed, 
     - Display a final success message to the user: "Gosu MCP server installed and configured successfully. Please /exit and start `claude` again for changes to take effect."

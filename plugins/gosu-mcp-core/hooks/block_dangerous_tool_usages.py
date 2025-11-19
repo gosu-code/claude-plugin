@@ -381,6 +381,22 @@ def output_decision(decision, reason=None):
 
     print(json.dumps(payload))
 
+def load_settings_from_path(path):
+    """Best-effort JSON loader that returns a dict or an empty default."""
+    if not path or not os.path.exists(path):
+        return {}
+
+    try:
+        with open(path, "r", encoding="utf-8") as config_file:
+            data = json.load(config_file)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        # Caller decides how to handle missing/invalid config data.
+        pass
+
+    return {}
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -395,17 +411,16 @@ def main():
     )
     args = parser.parse_args()
 
-    # Allow configuration-based override for auto-allow behavior
-    config_path = os.path.join(os.getcwd(), ".gosu", "settings.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as config_file:
-                config_data = json.load(config_file)
-            if isinstance(config_data, dict) and config_data.get("autoAllowNonDangerousToolUsage") is True:
-                args.and_auto_allow = True
-        except Exception:
-            # Ignore errors reading/parsing config; fall back to CLI flag behavior
-            pass
+    # Allow configuration-based override for auto-allow behavior.
+    # Repository-local settings override user-level defaults.
+    global_config_path = os.path.join(os.path.expanduser("~"), ".gosu", "settings.json")
+    local_config_path = os.path.join(os.getcwd(), ".gosu", "settings.json")
+
+    merged_config = load_settings_from_path(global_config_path)
+    merged_config.update(load_settings_from_path(local_config_path))
+
+    if merged_config.get("autoAllowNonDangerousToolUsage") is True:
+        args.and_auto_allow = True
 
     try:
         # Read JSON input from stdin
