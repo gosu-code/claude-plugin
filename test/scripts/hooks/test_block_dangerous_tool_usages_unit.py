@@ -178,6 +178,161 @@ def test_invalid_tool_input_error_message():
     assert "list" not in reason, "Error message should not expose type names"
     print("  ✓ Error message is generic and secure")
 
+def test_permission_request_allow():
+    """Test PermissionRequest event with allow behavior."""
+    print("\nTesting PermissionRequest event with allow behavior:")
+
+    # Create test input for a safe operation with PermissionRequest event
+    test_input = {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Bash",
+        "tool_input": {"command": "npm test"}
+    }
+
+    # Run the script with this input
+    script_path = hooks_script_dir / 'block_dangerous_tool_usages.py'
+    result = subprocess.run(
+        ['python3', str(script_path), '--and-auto-allow'],
+        input=json.dumps(test_input),
+        capture_output=True,
+        text=True
+    )
+
+    # Parse the output
+    output = json.loads(result.stdout)
+    hook_output = output.get('hookSpecificOutput', {})
+
+    # Verify the output format
+    print(f"  Output: {json.dumps(output, indent=2)}")
+    assert hook_output.get('hookEventName') == 'PermissionRequest', \
+        f"Expected hookEventName to be 'PermissionRequest', got: {hook_output.get('hookEventName')}"
+    assert 'decision' in hook_output, "Expected 'decision' key in hookSpecificOutput"
+    assert hook_output['decision']['behavior'] == 'allow', \
+        f"Expected behavior to be 'allow', got: {hook_output['decision']['behavior']}"
+    print("  ✓ PermissionRequest allow decision format is correct")
+
+def test_permission_request_deny():
+    """Test PermissionRequest event with deny behavior for dangerous command."""
+    print("\nTesting PermissionRequest event with deny behavior:")
+
+    # Create test input for a dangerous operation with PermissionRequest event
+    test_input = {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Bash",
+        "tool_input": {"command": "rm -rf /"}
+    }
+
+    # Run the script with this input
+    script_path = hooks_script_dir / 'block_dangerous_tool_usages.py'
+    result = subprocess.run(
+        ['python3', str(script_path)],
+        input=json.dumps(test_input),
+        capture_output=True,
+        text=True
+    )
+
+    # Parse the output
+    output = json.loads(result.stdout)
+    hook_output = output.get('hookSpecificOutput', {})
+
+    # Verify the output format
+    print(f"  Output: {json.dumps(output, indent=2)}")
+    assert hook_output.get('hookEventName') == 'PermissionRequest', \
+        f"Expected hookEventName to be 'PermissionRequest', got: {hook_output.get('hookEventName')}"
+    assert 'decision' in hook_output, "Expected 'decision' key in hookSpecificOutput"
+    assert hook_output['decision']['behavior'] == 'deny', \
+        f"Expected behavior to be 'deny', got: {hook_output['decision']['behavior']}"
+    assert 'message' in hook_output['decision'], "Expected 'message' key in decision for deny"
+    assert hook_output['decision']['interrupt'] == True, \
+        f"Expected interrupt to be True, got: {hook_output['decision'].get('interrupt')}"
+    print("  ✓ PermissionRequest deny decision format is correct")
+
+def test_permission_request_allow_with_updated_input():
+    """Test PermissionRequest event with allow behavior and updated input."""
+    print("\nTesting PermissionRequest event with updated input:")
+
+    # Note: In current implementation, updatedInput is not used, but we test the structure
+    # This test verifies the output format supports updatedInput when implemented
+    test_input = {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Bash",
+        "tool_input": {"command": "npm test"}
+    }
+
+    # Run the script with this input
+    script_path = hooks_script_dir / 'block_dangerous_tool_usages.py'
+    result = subprocess.run(
+        ['python3', str(script_path), '--and-auto-allow'],
+        input=json.dumps(test_input),
+        capture_output=True,
+        text=True
+    )
+
+    # Parse the output
+    output = json.loads(result.stdout)
+    hook_output = output.get('hookSpecificOutput', {})
+
+    # Verify the structure supports updatedInput (even if not present)
+    print(f"  Output: {json.dumps(output, indent=2)}")
+    assert hook_output.get('hookEventName') == 'PermissionRequest'
+    assert hook_output['decision']['behavior'] == 'allow'
+    # updatedInput is optional, so we just check the structure is valid JSON
+    print("  ✓ PermissionRequest structure supports updatedInput")
+
+def test_hook_event_detection():
+    """Test that hook event type is correctly detected from input."""
+    print("\nTesting hook event type detection:")
+
+    # Test with hook_event_name field
+    test_cases = [
+        {
+            "input": {
+                "hook_event_name": "PermissionRequest",
+                "tool_name": "Bash",
+                "tool_input": {"command": "echo test"}
+            },
+            "expected_event": "PermissionRequest",
+            "description": "PermissionRequest event"
+        },
+        {
+            "input": {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "echo test"}
+            },
+            "expected_event": "PreToolUse",
+            "description": "PreToolUse event"
+        },
+        {
+            "input": {
+                "tool_name": "Bash",
+                "tool_input": {"command": "echo test"}
+            },
+            "expected_event": "PreToolUse",
+            "description": "Default when no hook_event_name field"
+        }
+    ]
+
+    script_path = hooks_script_dir / 'block_dangerous_tool_usages.py'
+
+    for i, test_case in enumerate(test_cases):
+        result = subprocess.run(
+            ['python3', str(script_path), '--and-auto-allow'],
+            input=json.dumps(test_case["input"]),
+            capture_output=True,
+            text=True
+        )
+
+        output = json.loads(result.stdout)
+        hook_output = output.get('hookSpecificOutput', {})
+        detected_event = hook_output.get('hookEventName')
+
+        print(f"  Test case {i+1} ({test_case['description']}): Expected '{test_case['expected_event']}', got '{detected_event}'")
+        assert detected_event == test_case['expected_event'], \
+            f"Expected hookEventName to be '{test_case['expected_event']}', got: {detected_event}"
+
+    print("  ✓ Hook event type detection works correctly")
+
 if __name__ == '__main__':
     try:
         test_dangerous_rm_patterns()
@@ -186,6 +341,10 @@ if __name__ == '__main__':
         test_dangerous_git_patterns()
         test_safe_git_patterns()
         test_invalid_tool_input_error_message()
+        test_permission_request_allow()
+        test_permission_request_deny()
+        test_permission_request_allow_with_updated_input()
+        test_hook_event_detection()
         print("\n✅ All tests passed!")
         sys.exit(0)
     except AssertionError as e:

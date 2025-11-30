@@ -18,10 +18,11 @@
 # Source: http://opensource.org/licenses/AGPL-3.0
 # ------------------- LICENSE -------------------
 """
-Claude Code Pre-Tool-Use Hook: Block Dangerous Tool Usages
+Claude Code Hook: Block Dangerous Tool Usages
 
-This hook script intercepts and blocks dangerous tool usages before they execute,
-providing an additional layer of safety when using Claude Code CLI.
+This hook script intercepts and blocks dangerous tool usages, providing an additional
+layer of safety when using Claude Code CLI. Supports both PreToolUse and PermissionRequest
+hook events.
 
 Security Categories:
 -------------------
@@ -40,15 +41,46 @@ Security Categories:
    - Allows default*.env and .env.example files without prompting
    - Prevents accidental exposure of API keys and credentials
 
-Input/Output Format:
--------------------
-Input (via stdin): JSON with tool_name and tool_input
+Hook Event Types:
+----------------
+This script supports two hook event types:
+
+1. PreToolUse (default):
+   - Intercepts tool calls before execution
+   - Can deny, ask, or allow operations
+
+2. PermissionRequest:
+   - Controls permission requests shown to users
+   - Can allow (optionally with modified input) or deny (with message and interrupt)
+
+Input Format:
+------------
+Input (via stdin): JSON with hook event type, tool_name and tool_input
+Full example payload:
   {
+    "session_id": "abc123",
+    "transcript_path": "/Users/.../.claude/projects/.../00893aaf-19fa-41d2-8238-13269b9b3ca0.jsonl",
+    "cwd": "/Users/...",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",  # or "PermissionRequest" (defaults to "PreToolUse" if omitted)
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "/path/to/file.txt",
+      "content": "file content"
+    },
+    "tool_use_id": "toolu_01ABC123..."
+  }
+
+Minimal example:
+  {
+    "hook_event_name": "PreToolUse",
     "tool_name": "Bash",
     "tool_input": {"command": "rm -rf /"}
   }
 
-Output (to stdout): JSON with permission decision
+Output Formats:
+--------------
+PreToolUse output:
   {
     "hookSpecificOutput": {
       "hookEventName": "PreToolUse",
@@ -57,11 +89,34 @@ Output (to stdout): JSON with permission decision
     }
   }
 
+PermissionRequest output (allow):
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PermissionRequest",
+      "decision": {
+        "behavior": "allow",
+        "updatedInput": {...}  # Optional: modified tool parameters
+      }
+    }
+  }
+
+PermissionRequest output (deny):
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PermissionRequest",
+      "decision": {
+        "behavior": "deny",
+        "message": "Reason for denial",  # Optional
+        "interrupt": true  # Optional: stop Claude
+      }
+    }
+  }
+
 Usage Modes:
 -----------
 1. Default mode (recommended):
    - Blocks dangerous operations with "deny" decision
-   - Asks for .env file access with "ask" decision
+   - Asks for .env file access with "ask" decision (PreToolUse) or "allow" (PermissionRequest)
    - Exits with code 0 (no output) for safe operations
    - Claude's permission system decides how to handle safe operations
 
@@ -231,7 +286,7 @@ def is_dangerous_rm_command(command) -> int:
         return 2
 
     if not paths:
-        # "rm -rf" with no explicit target is catastrophic.
+        # "rm -rf" without specific target is catastrophic.
         return 2
 
     for path in paths:
@@ -381,6 +436,88 @@ def output_decision(decision, reason=None):
 
     print(json.dumps(payload))
 
+def output_permission_request_decision(behavior, updated_input=None, message=None, interrupt=False):
+    """
+    Output a PermissionRequest decision in the expected JSON format.
+
+    This function formats and prints the PermissionRequest decision that Claude Code
+    will use to determine whether to allow or deny a permission request shown to the user.
+
+    Args:
+        behavior (str): The decision behavior - one of "allow" or "deny"
+        updated_input (dict, optional): For "allow" behavior, modified tool input parameters
+        message (str, optional): For "deny" behavior, explanation for why permission was denied
+        interrupt (bool, optional): For "deny" behavior, whether to stop Claude (default: False)
+
+    Output format (to stdout):
+        For "allow" behavior:
+        {
+          "hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {
+              "behavior": "allow",
+              "updatedInput": {...}  # Optional
+            }
+          }
+        }
+
+        For "deny" behavior:
+        {
+          "hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {
+              "behavior": "deny",
+              "message": "Reason for denial",  # Optional
+              "interrupt": true/false  # Optional
+            }
+          }
+        }
+    """
+    decision = {"behavior": behavior}
+
+    if behavior == "allow" and updated_input is not None:
+        decision["updatedInput"] = updated_input
+    elif behavior == "deny":
+        if message is not None:
+            decision["message"] = message
+        if interrupt:
+            decision["interrupt"] = interrupt
+
+    payload = {
+        "hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": decision,
+        }
+    }
+
+    print(json.dumps(payload))
+
+def output_unified_decision(hook_event, decision_type, reason=None, updated_input=None, interrupt=False):
+    """
+    Unified decision output that routes to the correct format based on hook event type.
+
+    Args:
+        hook_event (str): The hook event type ("PreToolUse" or "PermissionRequest")
+        decision_type (str): The decision - "allow", "deny", or "ask" (for PreToolUse only)
+        reason (str, optional): Reason for the decision
+        updated_input (dict, optional): For PermissionRequest allow, modified tool input
+        interrupt (bool, optional): For PermissionRequest deny, whether to stop Claude
+    """
+    if hook_event == 'PermissionRequest':
+        # Map decision types to PermissionRequest behaviors
+        if decision_type == 'deny':
+            output_permission_request_decision("deny", message=reason, interrupt=interrupt)
+        elif decision_type == 'allow':
+            # For 'ask', we allow and let the permission system handle the user prompt
+            output_permission_request_decision("allow", updated_input=updated_input)
+        else: # e.g: decision_type = 'ask'
+            # PermissionRequest does not support 'ask' in output
+            # So to retain the same behavior, we simply exit with code 0
+            sys.exit(0)  # exit with code 0 (safe operation, no explicit action)
+    else:
+        # PreToolUse format
+        output_decision(decision_type, reason)
+
 def load_settings_from_path(path):
     """Best-effort JSON loader that returns a dict or an empty default."""
     if not path or not os.path.exists(path):
@@ -422,23 +559,35 @@ def main():
     if merged_config.get("autoAllowNonDangerousToolUsage") is True:
         args.and_auto_allow = True
 
+    # Initialize hook_event to None for error handling
+    hook_event = None
+
     try:
         # Read JSON input from stdin
         input_data = json.load(sys.stdin)
+
+        # Detect the hook event type (defaults to PreToolUse for backwards compatibility)
+        hook_event = input_data.get('hook_event_name', 'PreToolUse')
 
         tool_name = input_data.get('tool_name', '')
         tool_input = input_data.get('tool_input', {})
 
         # Validate that tool_input is a dictionary
         if not isinstance(tool_input, dict):
-            output_decision("deny", "Invalid tool_input format: expected a dictionary")
+            output_unified_decision(
+                hook_event,
+                "deny",
+                reason="Invalid tool_input format: expected a dictionary",
+                interrupt=True
+            )
             return
 
         # Check for .env file access (ask user for confirmation)
         if is_env_file_access(tool_name, tool_input):
-            output_decision(
+            output_unified_decision(
+                hook_event,
                 "ask",
-                "This tool is attempting to access .env files which may contain sensitive data. Do you want to allow this access?"
+                reason="This tool is attempting to access .env files which may contain sensitive data. Do you want to allow this access?"
             )
             return
 
@@ -449,22 +598,36 @@ def main():
             # Block rm -rf commands with comprehensive pattern matching
             result_check =  is_dangerous_rm_command(command)
             if result_check == 2:
-                output_decision("deny", "Dangerous rm command detected and prevented.")
+                output_unified_decision(
+                    hook_event,
+                    "deny",
+                    reason="Dangerous rm command detected and prevented.",
+                    interrupt=True
+                )
                 return
             elif result_check == 1:
-                output_decision("ask", "Potentially Dangerous rm command detected. Do you want to run this command?")
+                output_unified_decision(
+                    hook_event,
+                    "ask",
+                    reason="Potentially Dangerous rm command detected. Do you want to run this command?"
+                )
                 return
 
             # Block dangerous git commands with comprehensive pattern matching
             if is_dangerous_git_command(command):
-                output_decision("deny", "Dangerous git command detected and prevented.")
+                output_unified_decision(
+                    hook_event,
+                    "deny",
+                    reason="Dangerous git command detected and prevented.",
+                    interrupt=True
+                )
                 return
 
         # If --and-auto-allow flag is set, explicitly allow safe operations
         # This bypasses the permission system for safe operations
         if args.and_auto_allow:
-            output_decision("allow")
-        # Otherwise, exit with code 0 (safe operation, no explicit decision)
+            output_unified_decision(hook_event, "allow")
+        # Otherwise, exit with code 0 (safe operation, no explicit action)
         # We use sys.exit(0) here to indicate successful completion with no output,
         # which signals the permission system to pass through without intervention.
         # This is intentional: returning would fall through to the exception handlers,
@@ -473,11 +636,23 @@ def main():
             sys.exit(0)
 
     except json.JSONDecodeError as e:
-        # Handle JSON decode errors
-        output_decision("deny", f"Failed to parse JSON input: {e}")
+        # Handle JSON decode errors - use detected event type or default to PreToolUse
+        event_type = hook_event if hook_event else 'PreToolUse'
+        output_unified_decision(
+            event_type,
+            "deny",
+            reason=f"Failed to parse JSON input: {e}",
+            interrupt=True
+        )
     except Exception as e:
-        # Handle any other errors
-        output_decision("deny", f"Unexpected error occurred: {e}")
+        # Handle any other errors - use detected event type or default to PreToolUse
+        event_type = hook_event if hook_event else 'PreToolUse'
+        output_unified_decision(
+            event_type,
+            "deny",
+            reason=f"Unexpected error occurred: {e}",
+            interrupt=True
+        )
 
 if __name__ == '__main__':
     main()
