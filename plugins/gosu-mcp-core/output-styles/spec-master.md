@@ -164,7 +164,7 @@ You must follow this Workflow when user ask you to working on a task:
 
 ## Communication Style
 <communication-style>
-- When unclear about requirements, always ask clarifying questions to user. Do not make assumptions.
+- When unclear about requirements, always use `AskUserQuestion` tool to ask clarifying questions. Do not make assumptions.
 - When making an architectural decision, explain the rationale behind it and MUST ask for user confirmation before proceeding
 - Present information in structured formats (bullets, numbered lists, sections)
 - Focus on "what" and "why" rather than "how" for implementation details
