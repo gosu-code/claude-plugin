@@ -76,6 +76,7 @@ class TestGitWorktreeCreator(unittest.TestCase):
             'prompt': [],
             'branch': None,
             'worktree': None,
+            'base_branch': None,
             'plan_file': None,
             'agent_user': None,
             'copy_staged': True,
@@ -800,6 +801,236 @@ class TestGitWorktreeCreator(unittest.TestCase):
                     # Verify branch name was generated from prompt
                     self.assertEqual(creator.branch_name, 'agent/fix-critical-bug')
 
+    # ==================== Base Branch Resolution Tests ====================
+
+    def test_resolve_base_branch_local_exists(self):
+        """Test resolve_base_branch when branch exists locally"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            # Mock git branch --list to show branch exists locally
+            with patch.object(creator, 'run_command') as mock_cmd:
+                mock_result = Mock()
+                mock_result.returncode = 0
+                mock_result.stdout = "  develop\n"
+                mock_cmd.return_value = mock_result
+
+                result = creator.resolve_base_branch('develop')
+
+                self.assertEqual(result, 'develop')
+                mock_cmd.assert_called_once_with('git branch --list develop', check=False)
+
+    def test_resolve_base_branch_remote_exists(self):
+        """Test resolve_base_branch when branch exists on remote"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    if 'git branch --list develop' in cmd:
+                        mock_result.stdout = ""  # Not local
+                    elif 'git branch -r --list origin/develop' in cmd:
+                        mock_result.stdout = "  origin/develop\n"  # On remote
+                    elif 'git fetch origin develop' in cmd:
+                        mock_result.stdout = "Fetched develop"
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                result = creator.resolve_base_branch('develop')
+
+                self.assertEqual(result, 'origin/develop')
+                self.assertEqual(mock_cmd.call_count, 3)
+
+    def test_resolve_base_branch_not_found(self):
+        """Test resolve_base_branch when branch doesn't exist"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    mock_result.stdout = ""  # Branch not found
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with self.assertRaises(Exception) as context:
+                    creator.resolve_base_branch('nonexistent')
+
+                self.assertIn("not found locally or on remote", str(context.exception))
+
+    def test_resolve_base_branch_with_origin_prefix(self):
+        """Test resolve_base_branch when user provides 'origin/develop'"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                mock_result = Mock()
+                mock_result.returncode = 0
+                mock_result.stdout = "  develop\n"
+                mock_cmd.return_value = mock_result
+
+                result = creator.resolve_base_branch('origin/develop')
+
+                # Should normalize to just 'develop'
+                self.assertEqual(result, 'develop')
+                mock_cmd.assert_called_once_with('git branch --list develop', check=False)
+
+    def test_resolve_base_branch_fetch_failure(self):
+        """Test resolve_base_branch when fetch fails"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    if 'git branch --list develop' in cmd:
+                        mock_result.stdout = ""
+                    elif 'git branch -r --list origin/develop' in cmd:
+                        mock_result.stdout = "  origin/develop\n"
+                    elif 'git fetch origin develop' in cmd:
+                        raise subprocess.CalledProcessError(1, cmd, stderr="Network error")
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with self.assertRaises(Exception) as context:
+                    creator.resolve_base_branch('develop')
+
+                self.assertIn("Failed to fetch branch", str(context.exception))
+
+    def test_resolve_base_branch_no_remote(self):
+        """Test resolve_base_branch when no remote is configured"""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    if 'git remote' in cmd:
+                        mock_result.returncode = 0
+                        mock_result.stdout = ""  # No remotes
+                    else:
+                        mock_result.returncode = 0
+                        mock_result.stdout = ""  # Branch not found locally
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with self.assertRaises(Exception) as context:
+                    creator.resolve_base_branch('develop')
+
+                self.assertIn("no remote 'origin' configured", str(context.exception))
+
+    def test_create_worktree_with_base_branch(self):
+        """Test create_worktree with base branch specified"""
+        args = self.create_mock_args(
+            branch='feature/new-api',
+            base_branch='develop'
+        )
+
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    if 'git branch --list feature/new-api' in cmd:
+                        mock_result.stdout = ""  # Branch unique
+                    elif 'git branch --list develop' in cmd:
+                        mock_result.stdout = "  develop\n"  # Base exists locally
+                    elif 'git worktree add' in cmd:
+                        mock_result.stdout = "Preparing worktree"
+                    elif 'git worktree list' in cmd:
+                        mock_result.stdout = f"{creator.worktree_dir}\n"
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with patch.object(creator, 'find_unique_worktree_path') as mock_find:
+                    mock_find.return_value = str(Path(self.temp_dir) / "worktree-agent-no1")
+
+                    creator.create_worktree()
+
+                    # Verify worktree add was called with base branch
+                    worktree_add_calls = [call for call in mock_cmd.call_args_list if 'git worktree add' in str(call)]
+                    self.assertEqual(len(worktree_add_calls), 1)
+                    self.assertIn('develop', str(worktree_add_calls[0]))
+
+    def test_create_worktree_without_base_branch(self):
+        """Test backward compatibility: create_worktree without base branch"""
+        args = self.create_mock_args(branch='feature/test')
+
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    if 'git branch --list feature/test' in cmd:
+                        mock_result.stdout = ""
+                    elif 'git worktree add' in cmd:
+                        mock_result.stdout = "Preparing worktree"
+                    elif 'git worktree list' in cmd:
+                        mock_result.stdout = f"{creator.worktree_dir}\n"
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with patch.object(creator, 'find_unique_worktree_path') as mock_find:
+                    mock_find.return_value = str(Path(self.temp_dir) / "worktree-agent-no1")
+
+                    creator.create_worktree()
+
+                    # Verify worktree add was called without base branch
+                    worktree_add_calls = [call for call in mock_cmd.call_args_list if 'git worktree add' in str(call)]
+                    self.assertEqual(len(worktree_add_calls), 1)
+                    # Should not have a third argument (base ref)
+                    cmd_str = str(worktree_add_calls[0])
+                    # Count tokens: should be "git worktree add -b <branch> <path>" (no base ref)
+                    self.assertNotIn('develop', cmd_str)
+                    self.assertNotIn('origin/', cmd_str)
+
+    def test_create_worktree_base_branch_invalid(self):
+        """Test create_worktree with invalid base branch"""
+        args = self.create_mock_args(
+            branch='feature/test',
+            base_branch='invalid-branch'
+        )
+
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            with patch.object(creator, 'run_command') as mock_cmd:
+                def mock_run(cmd, check=True):
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    mock_result.stdout = ""  # Branch not found
+                    return mock_result
+
+                mock_cmd.side_effect = mock_run
+
+                with patch.object(creator, 'find_unique_worktree_path') as mock_find:
+                    mock_find.return_value = str(Path(self.temp_dir) / "worktree-agent-no1")
+
+                    with self.assertRaises(Exception) as context:
+                        creator.create_worktree()
+
+                    self.assertIn("not found", str(context.exception))
+
 
 class TestGitWorktreeCreatorIntegration(unittest.TestCase):
     """Integration tests for GitWorktreeCreator (requires git)"""
@@ -857,6 +1088,7 @@ class TestGitWorktreeCreatorIntegration(unittest.TestCase):
             'prompt': [],
             'branch': None,
             'worktree': None,
+            'base_branch': None,
             'plan_file': None,
             'agent_user': None,
             'copy_staged': True,
@@ -898,6 +1130,124 @@ class TestGitWorktreeCreatorIntegration(unittest.TestCase):
                                   text=True,
                                   check=True)
             self.assertIn("On branch", result.stdout)
+
+    def test_create_worktree_with_local_base_branch(self):
+        """Integration test: Create worktree from local base branch"""
+        # Create a develop branch
+        subprocess.run(['git', 'checkout', '-b', 'develop'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        (self.main_workspace / "develop.txt").write_text("develop branch file")
+        subprocess.run(['git', 'add', 'develop.txt'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        subprocess.run(['git', 'commit', '-m', 'Add develop file'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+
+        # Go back to main
+        subprocess.run(['git', 'checkout', 'main'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+
+        # Create worktree from develop
+        args = self.create_mock_args(
+            branch='feature/from-develop',
+            base_branch='develop'
+        )
+
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+            creator.create_worktree()
+
+            # Verify worktree was created
+            self.assertTrue(creator.worktree_dir.exists())
+
+            # Verify the worktree has the develop.txt file
+            self.assertTrue((creator.worktree_dir / "develop.txt").exists())
+
+            # Verify branch is based on develop
+            result = subprocess.run(['git', 'log', '--oneline'],
+                                  cwd=creator.worktree_dir,
+                                  capture_output=True,
+                                  text=True,
+                                  check=True)
+            self.assertIn("Add develop file", result.stdout)
+
+    def test_create_worktree_with_remote_base_branch(self):
+        """Integration test: Create worktree from remote base branch"""
+        # Create a bare remote repository
+        remote_dir = Path(self.temp_dir) / "remote.git"
+        subprocess.run(['git', 'init', '--bare', str(remote_dir)],
+                      capture_output=True,
+                      check=True)
+
+        # Add remote and push
+        subprocess.run(['git', 'remote', 'add', 'origin', str(remote_dir)],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        subprocess.run(['git', 'push', '-u', 'origin', 'main'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+
+        # Create and push a release branch
+        subprocess.run(['git', 'checkout', '-b', 'release-1.0'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        (self.main_workspace / "release.txt").write_text("release file")
+        subprocess.run(['git', 'add', 'release.txt'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        subprocess.run(['git', 'commit', '-m', 'Add release file'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        subprocess.run(['git', 'push', '-u', 'origin', 'release-1.0'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+
+        # Go back to main and delete local release branch
+        subprocess.run(['git', 'checkout', 'main'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+        subprocess.run(['git', 'branch', '-D', 'release-1.0'],
+                      cwd=self.main_workspace,
+                      capture_output=True,
+                      check=True)
+
+        # Create worktree from remote release branch
+        args = self.create_mock_args(
+            branch='hotfix/security-patch',
+            base_branch='release-1.0'
+        )
+
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+            creator.create_worktree()
+
+            # Verify worktree was created
+            self.assertTrue(creator.worktree_dir.exists())
+
+            # Verify the worktree has the release.txt file
+            self.assertTrue((creator.worktree_dir / "release.txt").exists())
+
+            # Verify branch is based on release-1.0
+            result = subprocess.run(['git', 'log', '--oneline'],
+                                  cwd=creator.worktree_dir,
+                                  capture_output=True,
+                                  text=True,
+                                  check=True)
+            self.assertIn("Add release file", result.stdout)
 
 
 if __name__ == '__main__':
