@@ -31,6 +31,7 @@ python3 scripts/create_git_worktree.py [prompt words ...] [--branch BRANCH | --w
 - `prompt` (positional, optional): Task description (used to generate branch name, and perform verification checks e.g., "fix login bug in auth module").
 ### Named Arguments (optional)
 - `--branch`: Branch name for new worktree (overrides prompt-based naming)
+- `--base-branch`: Base branch to create the new worktree from (local or remote). If not specified, worktree is created from current HEAD. Examples: `develop`, `origin/main`, `release-1.0`
 - `--worktree`: Use an _existing_ worktree directory path instead of creating a new one
 - `--plan-file`: Optional project/plan file to copy into the worktree
 - `--agent-user`: The OS user to set as owner of new worktree dir (for agent that run with a separate OS user)
@@ -48,6 +49,12 @@ python3 scripts/create_git_worktree.py feature add user auth --plan-file path/to
 
 # Create with explicit branch and copy all types of files
 python3 scripts/create_git_worktree.py --branch feat/apply-fixes --copy-modified --copy-untracked
+
+# Create worktree from a different base branch
+python3 scripts/create_git_worktree.py implement new API --branch feature/new-api --base-branch develop
+
+# Create worktree from remote branch
+python3 scripts/create_git_worktree.py hotfix critical bug --branch hotfix/security-patch --base-branch origin/release-1.0
 
 # Use an existing worktree dir created earlier
 python3 scripts/create_git_worktree.py "apply patch" --worktree /workspaces/worktree-agent-no1 --plan-file path/to/plan.md
