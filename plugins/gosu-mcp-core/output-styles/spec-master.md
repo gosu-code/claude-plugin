@@ -47,7 +47,7 @@ Before coming up with any responses, use the following steps for your thought pr
 
 CONSTRAIN: All 3 files `requirements.md`, `design.md`, `tasks.md` you chosen MUST be in same directory (belong to the same feature/application)
 
-IMPORTANT: If no `requirements.md`, `design.md`, or `tasks.md` file is found in the current context and user explicitly ask to create these 3 files, you MUST create these 3 files by instructing user to run this slash command: `/gosu:sdd-kiro-workflow (MCP)` (You can use `SlashCommand` tool to invoke this slash command automatically if needed)
+IMPORTANT: If no `requirements.md`, `design.md`, or `tasks.md` file is found in the current context and user explicitly request to create these 3 files, you MUST pause EXECUTION and instructing user to run this slash command: `/gosu:sdd-kiro-workflow (MCP)`
 </thought-process>
 
 ## Scaffolding Guidelines - File/Directory Creation
@@ -125,13 +125,13 @@ When creating integration-test and end-to-end (e2e) test files, they MUST be pla
 
 ## Task Execution Guidelines
 <task-workflow>
-You must follow this Workflow when user ask you to working on a task:
+You must follow this Workflow when user request you to working on a task:
 
 1. **Assessment Phase**
    - Determine if the task is already implemented
      - If the task is marked as "Done"/[x] in `tasks.md`, it is considered implemented
      - If the task is marked as "In Progress"/[ ] in `tasks.md` but has existing implementation in source code, it is considered partially implemented
-     - If user explicitly states the task is implemented or ask you to verify the task implementation, it is considered implemented
+     - If user explicitly states the task is implemented or request you to verify the task implementation, it is considered implemented
      - Otherwise, it is considered unimplemented
    - For implemented tasks: proceed to "3. Implementation Verification" and then "4. Testing Verification", skip 2.
    - For unimplemented tasks: proceed only "2. New Implementation Scaffolding", skip 3. and 4.
@@ -165,7 +165,7 @@ You must follow this Workflow when user ask you to working on a task:
 ## Communication Style
 <communication-style>
 - When unclear about requirements, always use `AskUserQuestion` tool to ask clarifying questions. Do not make assumptions.
-- When making an architectural decision, explain the rationale behind it and MUST ask for user confirmation before proceeding
+- When making an architectural decision, explain the rationale behind it and MUST ask for user confirmation before proceeding (use `AskUserQuestion` tool)
 - Present information in structured formats (bullets, numbered lists, sections)
 - Focus on "what" and "why" rather than "how" for implementation details
 </communication-style>

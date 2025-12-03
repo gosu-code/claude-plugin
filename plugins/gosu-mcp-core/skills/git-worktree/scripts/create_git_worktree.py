@@ -266,7 +266,7 @@ class GitWorktreeCreator:
         if self.args.plan_file:
             plan_src = Path(self.args.plan_file)
             if plan_src.exists():
-                plan_dst = self.worktree_dir / 'worktree-agent-task-plan.claude.md'
+                plan_dst = self.worktree_dir / 'worktree-agent-task-plan.md'
                 shutil.copy2(plan_src, plan_dst)
                 logger.info(f"Copied plan file: {plan_dst.name}")
             else:

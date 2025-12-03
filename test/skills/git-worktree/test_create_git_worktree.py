@@ -439,7 +439,7 @@ class TestGitWorktreeCreator(unittest.TestCase):
             creator.copy_plan_file()
 
             # Verify plan file was copied
-            copied_file = worktree_dir / "worktree-agent-task-plan.claude.md"
+            copied_file = worktree_dir / "worktree-agent-task-plan.md"
             self.assertTrue(copied_file.exists())
             self.assertEqual(copied_file.read_text(), "# Task Plan\n- Task 1\n- Task 2")
 

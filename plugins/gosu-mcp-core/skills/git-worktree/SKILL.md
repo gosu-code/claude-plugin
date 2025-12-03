@@ -57,7 +57,7 @@ python3 scripts/create_git_worktree.py "apply patch" --worktree /workspaces/work
 ### Troubleshooting
 
 - If failed to create git worktree, try to invoke the script again with different arguments based on the error message you see.
-- Do not attempt more than 3 times; if it still fails after 3 attempts, STOP and ask the user to create git worktree manually.
+- Do not attempt more than 3 times; if it still fails after 3 attempts, STOP and ask the user to create git worktree manually. (use `AskUserQuestion` tool)
 
 ## Worktree Verification
 
