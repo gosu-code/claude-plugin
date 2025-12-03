@@ -47,6 +47,7 @@ class GitWorktreeCreator:
         self.worktree_parent_dir = Path(args.worktree_parent_dir or '.')
         self.worktree_dir: Path = self.worktree_parent_dir / 'worktree'
         self.branch_name = "agent/default-branch-name"
+        self.base_branch = args.base_branch if hasattr(args, 'base_branch') else None
         
     def run_command(self, cmd, cwd=None, check=True):
         """Execute a shell command and return the result."""
@@ -87,7 +88,51 @@ class GitWorktreeCreator:
                     return new_name
                 counter += 1
         return branch_name
-    
+
+    def resolve_base_branch(self, base_branch_arg):
+        """Resolve base branch reference and ensure it's available locally.
+
+        Args:
+            base_branch_arg: Base branch name, can be 'branch', 'origin/branch', or remote ref
+
+        Returns:
+            str: Resolved branch reference suitable for git worktree add
+
+        Raises:
+            Exception: If branch doesn't exist locally or remotely, or fetch fails
+        """
+        # Normalize input: strip 'origin/' prefix if provided
+        base_branch = base_branch_arg.replace('origin/', '') if base_branch_arg.startswith('origin/') else base_branch_arg
+
+        logger.info(f"Resolving base branch: {base_branch_arg} -> {base_branch}")
+
+        # Check if branch exists locally
+        result = self.run_command(f"git branch --list {base_branch}", check=False)
+        if result.returncode == 0 and base_branch in result.stdout:
+            logger.info(f"Base branch '{base_branch}' found locally")
+            return base_branch
+
+        # Check if branch exists on remote
+        result = self.run_command(f"git branch -r --list origin/{base_branch}", check=False)
+        if result.returncode == 0 and f"origin/{base_branch}" in result.stdout:
+            logger.info(f"Base branch 'origin/{base_branch}' found on remote, fetching...")
+
+            # Fetch the branch from remote
+            try:
+                self.run_command(f"git fetch origin {base_branch}")
+                logger.info(f"Successfully fetched branch '{base_branch}' from remote")
+                return f"origin/{base_branch}"
+            except subprocess.CalledProcessError as e:
+                raise Exception(f"Failed to fetch branch '{base_branch}' from remote: {e.stderr}")
+
+        # Check if remote exists
+        result = self.run_command("git remote", check=False)
+        if result.returncode != 0 or 'origin' not in result.stdout:
+            raise Exception(f"Base branch '{base_branch}' not found locally and no remote 'origin' configured")
+
+        # Branch not found
+        raise Exception(f"Base branch '{base_branch}' not found locally or on remote 'origin'")
+
     def find_unique_worktree_path(self, base_path):
         """Find a unique worktree path by incrementing the number."""
         # Parse the base path to extract the pattern
@@ -136,11 +181,11 @@ class GitWorktreeCreator:
                 # Generate branch name from prompt arguments
                 prompt = ' '.join(self.args.prompt) if self.args.prompt else 'default task'
                 self.branch_name = self.generate_branch_name(prompt)
-            
+
             # Make branch name unique
             self.branch_name = self.make_branch_unique(self.branch_name)
             logger.info(f"Using branch name: {self.branch_name}")
-            
+
             # Find unique worktree path (now using self.worktree_parent_dir)
             base_worktree_path = str(self.worktree_parent_dir / "worktree-agent-no1")
             worktree_dir = self.find_unique_worktree_path(base_worktree_path)
@@ -148,16 +193,25 @@ class GitWorktreeCreator:
                 raise Exception("Failed to find a unique worktree path.")
             self.worktree_dir = Path(worktree_dir)
             logger.info(f"Creating worktree at: {self.worktree_dir}")
-            
+
+            # Resolve base branch if provided
+            base_ref = None
+            if self.base_branch:
+                base_ref = self.resolve_base_branch(self.base_branch)
+                logger.info(f"Using base branch: {base_ref}")
+
             # Create the worktree
-            cmd = f"git worktree add -b {self.branch_name} {self.worktree_dir}"
+            if base_ref:
+                cmd = f"git worktree add -b {self.branch_name} {self.worktree_dir} {base_ref}"
+            else:
+                cmd = f"git worktree add -b {self.branch_name} {self.worktree_dir}"
             self.run_command(cmd)
-            
+
             # Verify creation
             result = self.run_command("git worktree list")
             if str(self.worktree_dir) not in result.stdout:
                 raise Exception(f"Failed to create worktree at {self.worktree_dir}")
-            
+
             logger.info(f"Successfully created worktree with branch {self.branch_name}")
     
     def copy_git_ignored_files(self):
@@ -411,6 +465,8 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--branch', help='Branch name for new worktree')
     group.add_argument('--worktree', help='Existing worktree directory path')
+    parser.add_argument('--base-branch',
+                        help='Base branch to create worktree from (local or remote, e.g., develop, origin/develop)')
     parser.add_argument('--plan-file', help='Path to task plan file')
     parser.add_argument('--agent-user', help='User to set as owner of worktree directory')
     parser.add_argument('--no-copy-staged', dest='copy_staged', action='store_false', help='Do not copy staged files in worktree')
@@ -421,7 +477,7 @@ def main():
     parser.set_defaults(copy_untracked=False)
     # Add new argument for worktree parent directory
     parser.add_argument('--worktree-parent-dir',
-        default=str(Path.cwd().parent), 
+        default=str(Path.cwd().parent),
         help='Parent directory in which to place the worktree (default: parent of current directory)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     args = parser.parse_args()
