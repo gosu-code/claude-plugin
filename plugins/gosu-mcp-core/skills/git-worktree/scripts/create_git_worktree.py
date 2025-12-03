@@ -107,26 +107,26 @@ class GitWorktreeCreator:
         logger.info(f"Resolving base branch: {base_branch_arg} -> {base_branch}")
 
         # Check if branch exists locally
-        result = self.run_command(f"git branch --list {base_branch}", check=False)
+        result = self.run_command(f"git branch --list {base_branch}", cwd=self.main_workspace, check=False)
         if result.returncode == 0 and base_branch in result.stdout:
             logger.info(f"Base branch '{base_branch}' found locally")
             return base_branch
 
         # Check if branch exists on remote
-        result = self.run_command(f"git branch -r --list origin/{base_branch}", check=False)
+        result = self.run_command(f"git branch -r --list origin/{base_branch}", cwd=self.main_workspace, check=False)
         if result.returncode == 0 and f"origin/{base_branch}" in result.stdout:
             logger.info(f"Base branch 'origin/{base_branch}' found on remote, fetching...")
 
             # Fetch the branch from remote
             try:
-                self.run_command(f"git fetch origin {base_branch}")
+                self.run_command(f"git fetch origin {base_branch}", cwd=self.main_workspace)
                 logger.info(f"Successfully fetched branch '{base_branch}' from remote")
                 return f"origin/{base_branch}"
             except subprocess.CalledProcessError as e:
                 raise Exception(f"Failed to fetch branch '{base_branch}' from remote: {e.stderr}")
 
         # Check if remote exists
-        result = self.run_command("git remote", check=False)
+        result = self.run_command("git remote", cwd=self.main_workspace, check=False)
         if result.returncode != 0 or 'origin' not in result.stdout:
             raise Exception(f"Base branch '{base_branch}' not found locally and no remote 'origin' configured")
 
@@ -205,10 +205,10 @@ class GitWorktreeCreator:
                 cmd = f"git worktree add -b {self.branch_name} {self.worktree_dir} {base_ref}"
             else:
                 cmd = f"git worktree add -b {self.branch_name} {self.worktree_dir}"
-            self.run_command(cmd)
+            self.run_command(cmd, cwd=self.main_workspace)
 
             # Verify creation
-            result = self.run_command("git worktree list")
+            result = self.run_command("git worktree list", cwd=self.main_workspace)
             if str(self.worktree_dir) not in result.stdout:
                 raise Exception(f"Failed to create worktree at {self.worktree_dir}")
 
