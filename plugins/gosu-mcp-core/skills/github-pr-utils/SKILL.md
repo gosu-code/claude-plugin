@@ -30,7 +30,7 @@ scripts/get_pr_bot_review_comments.sh [OPTIONS] <owner> <repo> <pr_number>
 - `--exclude-resolved` - Filter out resolved review threads
 - `--exclude-outdated` - Filter out outdated review comments
 - `--include-github-user login1,login2` - Also include comments from specific GitHub users (comma-separated list)
-- `--include-diff-hunk` - Include the diff hunk context for each comment, do use this option unless explicitly asked by user.
+- `--include-diff-hunk` - Include the diff hunk context for each comment, do use this option unless explicitly requested by user.
 - `-h, --help` - Display help message
 
 #### Arguments

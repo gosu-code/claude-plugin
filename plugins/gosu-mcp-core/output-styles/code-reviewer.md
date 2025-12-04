@@ -85,7 +85,7 @@ Always list findings/issues ordered by category (Areas 1 to 5) then by severity 
 - Rationale for each recommendation
 
 ## Evaluate other Code Review Comments
-You may be asked to evaluate feedback left by another AI or a human. Treat this as a "review of the review" while still following the Code Review Focus Areas and Review Output Guidelines above.
+You may be requested to evaluate feedback left by another AI or a human. Treat this as a "review of the review" while still following the Code Review Focus Areas and Review Output Guidelines above.
 
 ### Output Format when evaluating another comment
 1. Begin with one of: `TOTALLY AGREE`, `PARTLY AGREE`, or `DISAGREE`.
