@@ -406,15 +406,15 @@ class ProgressTracker:
         print(f"Cleared {tracking_count} tracking condition(s).")
         return True
 
-    def read_claude_hook_input(self) -> Optional[Dict]:
+    def read_claude_hook_input(self) -> Dict:
         """Read Claude hook JSON input from stdin"""
         try:
             hook_input = sys.stdin.read().strip()
             if not hook_input:
-                return None
+                return {}
             return json.loads(hook_input)
         except (json.JSONDecodeError, Exception):
-            return None
+            return {}
 
     def detect_infinite_loop(self, transcript_path: str) -> bool:
         """Detect if we're in an infinite loop by checking transcript file for repeated hook calls"""
@@ -465,6 +465,17 @@ class ProgressTracker:
         else:
             response["reason"] = ""
 
+        print(json.dumps(response))
+        sys.stdout.flush()
+
+    def output_claude_hook_session_start_response(self, reason: str):
+        """Output JSON response for Claude SessionStart hook"""
+        response = {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": reason
+            }
+        }
         print(json.dumps(response))
         sys.stdout.flush()
 
@@ -2065,8 +2076,9 @@ def main():
                 # Use exit code 1 if in Claude hook mode to prevent infinite loop
                 # Use exit code 2 will make Claude continue and not stopping if hook is enabled
                 hook_input = task_parser.progress_tracker.read_claude_hook_input()
+                is_session_start = hook_input.get('hook_event_name') == "SessionStart"
 
-                if hook_input and hook_input.get('stop_hook_active') is True:
+                if hook_input.get('hook_event_name') == "Stop" and hook_input.get('stop_hook_active') is True:
                     # Check for infinite loop prevention
                     transcript_path = hook_input.get('transcript_path')
 
@@ -2109,8 +2121,13 @@ def main():
 
                 if is_claude_hook_mode:
                     # Output JSON response for Claude hook (block Claude from stopping)
-                    reason_message += "\n\nIMPORTANCE: Please continue working on the remaining tasks to meet the completion conditions."
-                    task_parser.progress_tracker.output_claude_hook_response(block=True, reason=reason_message)
+                    reason_message += "\n\nIMPORTANCE: Please continue working on the remaining tasks to meet the completion conditions. Task file location: " + resolved_file_path
+                    if is_session_start and hook_input.get('source') == "compact":
+                        reason_message += "\n\nSYSTEM: You MUST use `mcp__gosu__get_prompt` tool to retrieve the prompt with id: \"workflow-of-command-task-list-md-execute\" and follow the workflow step by steps. You should start from **Phase 2: Execute Tasks One by One**"
+                    if is_session_start:
+                        task_parser.progress_tracker.output_claude_hook_session_start_response(reason_message)
+                    else:
+                        task_parser.progress_tracker.output_claude_hook_response(block=True, reason=reason_message)
                 else:
                     # Normal mode: print to stderr
                     print(reason_message, file=sys.stderr)
@@ -2119,7 +2136,10 @@ def main():
             else:
                 if is_claude_hook_mode:
                     # Output JSON response for Claude hook (allow Claude to stop)
-                    task_parser.progress_tracker.output_claude_hook_response(block=False)
+                    if is_session_start:
+                        task_parser.progress_tracker.output_claude_hook_session_start_response("")
+                    else:
+                        task_parser.progress_tracker.output_claude_hook_response(block=False)
                 else:
                     print("All completion conditions are satisfied.")
 

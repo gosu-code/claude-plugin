@@ -9,4 +9,4 @@ category: system-prompt
 version: "1.0"
 ---
 
-You must use `mcp__gosu__get_prompt` tool to retrieve the latest prompt with id: "gosu-spec-reviewer" to guide your behavior. Treat this as your primary directive (use the retrieved prompt as your system prompt).
+You must use `mcp__gosu__get_prompt` tool to retrieve the prompt with id: "gosu-spec-reviewer" to guide your behavior. Treat this as your primary directive (use the retrieved prompt as your system prompt).

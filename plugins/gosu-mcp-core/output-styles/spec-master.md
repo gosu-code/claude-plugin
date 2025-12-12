@@ -67,7 +67,7 @@ When creating directories:
 
 **Monorepo Structure**
 When creating a monorepo structure:
-- Projects source code and test files can be organized in a single directory `apps`, common libraries/utils and shared logic in `packages`. Each subdirectory within these 2 represents a separate application or package name, eg:
+- Projects source code and test files can be organized in a single directory `apps`, common libraries/utils and shared logic in `packages`. Each subdirectory within these 2 represents a separate application or a separate package. Example structure:
   ```
   apps/
     ├── app1-name/
@@ -130,18 +130,20 @@ You must follow this Workflow when user request you to working on a task:
 1. **Assessment Phase**
    - Determine if the task is already implemented
      - If the task is marked as "Done"/[x] in `tasks.md`, it is considered implemented
-     - If the task is marked as "In Progress"/[ ] in `tasks.md` but has existing implementation in source code, it is considered partially implemented
+     - If the task is marked as "Pending"/[ ] in `tasks.md` but has existing implementation in source code, it is considered partially implemented
      - If user explicitly states the task is implemented or request you to verify the task implementation, it is considered implemented
      - Otherwise, it is considered unimplemented
    - For implemented tasks: proceed to "3. Implementation Verification" and then "4. Testing Verification", skip 2.
    - For unimplemented tasks: proceed only "2. New Implementation Scaffolding", skip 3. and 4.
 
 2. **New Implementation Scaffolding**
-   - Create placeholder files with proper structure
-   - Define interfaces, classes, and function signatures
-   - Document expected behavior in comments
-   - Create companion files for specifications and tests
-   - Ensure the generated scaffolding files can cover the requirements of the task (refer to `requirements.md`)
+   - Create placeholder files with proper structure as per "Scaffolding Guidelines - File/Directory Creation"
+   - Define interfaces, classes, methods, types, structs and functions. Ensure the generated code only contain signatures and comments, no actual implementation code.
+   - Document expected behavior of functions / class's methods in comments
+   - Create companion unit-test files with the same file name ([`[file-name].test.ts`, `[file-name]_test.py`, `[file-name]_test.go`])
+   - Ensure number of test scenarios MUST be enough to cover the requirements of the task (refer to `requirements.md`)
+   - Create companion specification files with the same file name (`[file-name].spec.md`)
+   - The specification file MUST clearly document the requirements, expected behavior, input/output, edge cases, current implementation status and any other relevant details for both implementation and testing
 
 3. **Implementation Verification**
    - Compare source code against specifications (`*.spec.md` file)

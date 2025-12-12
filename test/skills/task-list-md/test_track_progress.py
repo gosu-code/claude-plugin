@@ -28,6 +28,7 @@ import os
 import json
 import tempfile
 import shutil
+import io
 from pathlib import Path
 from datetime import datetime, timedelta
 import sys
@@ -89,6 +90,26 @@ class TestTrackProgress(unittest.TestCase):
             with open(self.progress_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
+
+    def test_read_claude_hook_input_empty_returns_empty_dict(self):
+        """read_claude_hook_input should return {} for empty stdin"""
+        tracker = ProgressTracker()
+        original_stdin = sys.stdin
+        try:
+            sys.stdin = io.StringIO("")
+            self.assertEqual(tracker.read_claude_hook_input(), {})
+        finally:
+            sys.stdin = original_stdin
+
+    def test_read_claude_hook_input_invalid_json_returns_empty_dict(self):
+        """read_claude_hook_input should return {} for malformed JSON"""
+        tracker = ProgressTracker()
+        original_stdin = sys.stdin
+        try:
+            sys.stdin = io.StringIO("{not: valid json")
+            self.assertEqual(tracker.read_claude_hook_input(), {})
+        finally:
+            sys.stdin = original_stdin
 
     def test_track_progress_help(self):
         """Test track-progress help command displays usage information"""
@@ -398,6 +419,28 @@ class TestTrackProgress(unittest.TestCase):
         self.assertIn("--claude-hook", result.stdout)
         self.assertIn("Claude hook mode", result.stdout)
 
+    def test_claude_hook_session_start_without_transcript_allowed(self):
+        """SessionStart events should not fail when stop_hook_active is true and no transcript is provided"""
+        hook_input = {
+            "session_id": "test123",
+            "hook_event_name": "SessionStart",
+            "stop_hook_active": True
+        }
+
+        # Add a satisfied condition to exercise the check path
+        self.run_command("track-progress", "add", str(self.test_tasks), "1")
+
+        cmd = ["python3", str(self.script_path), "track-progress", "check", str(self.test_tasks), "--claude-hook"]
+        result = subprocess.run(cmd, input=json.dumps(hook_input), text=True, capture_output=True)
+
+        self.assertEqual(result.returncode, 0)
+        response = json.loads(result.stdout.strip())
+        self.assertIn("hookSpecificOutput", response)
+        self.assertEqual(response["hookSpecificOutput"].get("hookEventName"), "SessionStart")
+        self.assertEqual(response["hookSpecificOutput"].get("additionalContext"), "")
+        self.assertNotIn("decision", response)
+        self.assertNotIn("transcript", result.stderr.lower())
+
     def test_claude_hook_with_stop_hook_active_no_transcript(self):
         """Test Claude hook mode with stop_hook_active but no transcript path"""
         import subprocess
@@ -567,6 +610,33 @@ class TestTrackProgress(unittest.TestCase):
 
         finally:
             os.unlink(transcript_path)
+
+    def test_claude_hook_compact_session_start_includes_location_and_directive(self):
+        """SessionStart from compact source should include task location and CRITICAL directive"""
+        import subprocess
+
+        hook_input = {
+            "session_id": "test123",
+            "hook_event_name": "SessionStart",
+            "stop_hook_active": True,
+            "source": "compact"
+        }
+
+        # Add a tracking condition that will not be met
+        self.run_command("track-progress", "add", str(self.test_tasks), "2")
+
+        cmd = ["python3", str(self.script_path), "track-progress", "check", str(self.test_tasks), "--claude-hook"]
+        result = subprocess.run(cmd, input=json.dumps(hook_input), text=True, capture_output=True)
+
+        self.assertEqual(result.returncode, 2)
+        response = json.loads(result.stdout.strip())
+        self.assertIn("hookSpecificOutput", response)
+        hook_output = response["hookSpecificOutput"]
+        self.assertEqual(hook_output.get("hookEventName"), "SessionStart")
+        reason = hook_output.get("additionalContext", "")
+        self.assertIn("Completion conditions not met", reason)
+        self.assertIn(f"Task file location: {self.test_tasks}", reason)
+        self.assertIn("workflow-of-command-task-list-md-execute", reason)
 
     def test_claude_hook_regex_pattern_variations(self):
         """Test the regex pattern matches various command formats"""
