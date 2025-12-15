@@ -14,6 +14,12 @@ The voice-coding plugin improves the voice coding experience by automatically pr
 - **Smart Thresholds**: Only activates for prompts that meet length and complexity criteria
 - **Non-Intrusive**: Seamlessly integrates without disrupting normal Claude Code workflows
 
+### Roadmap Features
+
+- **Voice Coding Session Collection**: Automatically save all voice input prompts of the user in the current session to a JSON file in `~/.gosu/voice-coding/[sesison-id].json`. Then when Claude Code finish (Stop hook), ask Claude Code to read this session JSON file, for every voice input prompts in this file derive the actual meaning and save to the same file as a pair of (voice input -> derive output)
+- **Enhance Prompt based on past Sessions**: Use the historical pairs saved in the previous session to enhance the user voice input prompts of current session. If session data is small can provide all pairs. Else we can search for pairs by keywords or sematic search with embedding (qdrant mcp/script)
+
+
 ## Installation
 
 1. Install the plugin:
