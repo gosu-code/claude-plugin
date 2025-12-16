@@ -506,6 +506,8 @@ class TaskParser:
         task_content_lines = []
 
         for line_num, line in enumerate(self.file_lines, 1):
+            # remove newline from line
+            line = line.replace('\n','')
             # Check if this is a task line
             # Escape any user-controlled input to prevent regex injection
             task_match = re.match(r'^(\s*)-\s*(\[[ \-x\+\*]\])\s*(\d+(?:\.\d+)*)\.?\s*(.*)$', line)
@@ -1996,7 +1998,7 @@ def main():
                 sys.exit(1)
 
     # Resolve the file path (auto-select from .tasks.local.json if not provided)
-    resolved_file_path = resolve_file_path(args.file, hasattr(args, 'claude_hook') and args.claude_hook)
+    resolved_file_path = resolve_file_path(getattr(args, 'file', None), hasattr(args, 'claude_hook') and args.claude_hook)
 
     # Initialize task parser
     task_parser = TaskParser(resolved_file_path)
