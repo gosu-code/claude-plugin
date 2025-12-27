@@ -38,8 +38,9 @@ from voice_input_prompt_enhancer import (
     should_enhance_prompt,
     count_placeholders,
     count_ellipsis,
+    count_nameholders,
     get_project_context,
-    generate_file_finding_instructions,
+    generate_prompt_enhancing_instructions,
     MIN_LONG_PROMPT_LENGTH,
 )
 
@@ -237,7 +238,7 @@ class TestGetProjectContext(unittest.TestCase):
 
 
 class TestGenerateFileFindingInstructions(unittest.TestCase):
-    """Test the generate_file_finding_instructions function."""
+    """Test the generate_prompt_enhancing_instructions function."""
 
     def test_placeholder_instructions(self):
         """Test instructions generated for placeholder patterns."""
@@ -247,7 +248,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update [placeholder] in the code"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("placeholder", instructions.lower())
         self.assertIn("Glob tool", instructions)
@@ -260,7 +261,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update files in src/..."
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("ellipsis pattern", instructions)
         self.assertIn("infer and fill in", instructions.lower())
@@ -275,7 +276,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
 
         # Create a long prompt
         long_prompt = "Update placeholder " + "x" * MIN_LONG_PROMPT_LENGTH
-        instructions = generate_file_finding_instructions(long_prompt, context)
+        instructions = generate_prompt_enhancing_instructions(long_prompt, context)
 
         self.assertIn("Speech To Text", instructions)
         self.assertIn("voice input", instructions.lower())
@@ -289,7 +290,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
         }
 
         short_prompt = "Update placeholder"
-        instructions = generate_file_finding_instructions(short_prompt, context)
+        instructions = generate_prompt_enhancing_instructions(short_prompt, context)
 
         self.assertNotIn("Speech To Text", instructions)
 
@@ -301,7 +302,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update test files"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("test", instructions.lower())
         self.assertIn("test directory", instructions.lower())
@@ -314,7 +315,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update config settings"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("config", instructions.lower())
 
@@ -326,7 +327,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update UI component"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("component", instructions.lower())
 
@@ -340,12 +341,12 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
 
         # Test with 'service' keyword
         prompt_service = "Update user service"
-        instructions = generate_file_finding_instructions(prompt_service, context)
+        instructions = generate_prompt_enhancing_instructions(prompt_service, context)
         self.assertIn("service", instructions.lower())
 
         # Test with 'api' keyword
         prompt_api = "Update API endpoint"
-        instructions_api = generate_file_finding_instructions(prompt_api, context)
+        instructions_api = generate_prompt_enhancing_instructions(prompt_api, context)
         self.assertIn("api", instructions_api.lower())
 
     def test_keyword_category_utility_matching(self):
@@ -358,12 +359,12 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
 
         # Test with 'util' keyword
         prompt_util = "Update util functions"
-        instructions = generate_file_finding_instructions(prompt_util, context)
+        instructions = generate_prompt_enhancing_instructions(prompt_util, context)
         self.assertIn("util", instructions.lower())
 
         # Test with 'helper' keyword
         prompt_helper = "Update helper methods"
-        instructions_helper = generate_file_finding_instructions(prompt_helper, context)
+        instructions_helper = generate_prompt_enhancing_instructions(prompt_helper, context)
         self.assertIn("helper", instructions_helper.lower())
 
     def test_keyword_category_tooling_matching(self):
@@ -376,12 +377,12 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
 
         # Test with 'script' keyword
         prompt_script = "Update build script"
-        instructions = generate_file_finding_instructions(prompt_script, context)
+        instructions = generate_prompt_enhancing_instructions(prompt_script, context)
         self.assertIn("script", instructions.lower())
 
         # Test with 'tool' keyword
         prompt_tool = "Update testing tool"
-        instructions_tool = generate_file_finding_instructions(prompt_tool, context)
+        instructions_tool = generate_prompt_enhancing_instructions(prompt_tool, context)
         self.assertIn("tool", instructions_tool.lower())
 
     def test_no_matching_directories(self):
@@ -392,7 +393,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update test files"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # Should still have general search strategies
         self.assertIn("Glob tool", instructions)
@@ -406,7 +407,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update test service and util functions"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # All matching categories should be included
         self.assertIn("test", instructions.lower())
@@ -422,9 +423,9 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
         }
         # Use exact "placeholder" text (not placeholder1, placeholder2, etc.)
         prompt = "Update [placeholder] and <placeholder> and {placeholder}"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
-        self.assertIn("3 placeholders", instructions)
+        self.assertIn("3 placeholder(s)", instructions)
 
     def test_ellipsis_count_in_instructions(self):
         """Test that ellipsis count is correctly reported."""
@@ -434,7 +435,7 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
             "project_name": "test"
         }
         prompt = "Update files in src/... and test/... etc"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         self.assertIn("3 ellipsis pattern", instructions)
 
@@ -536,7 +537,7 @@ class TestMixedPatterns(unittest.TestCase):
             "project_name": "test-project"
         }
         prompt = "Update test [placeholder] files in src/... etc"
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # Should include all relevant suggestions
         self.assertIn("placeholder", instructions.lower())
@@ -556,10 +557,10 @@ class TestMixedPatterns(unittest.TestCase):
             "the service handlers in src/services/... and util functions etc "
             "and make sure to update in this file as well"
         )
-        instructions = generate_file_finding_instructions(prompt, context)
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # Should detect all patterns
-        self.assertIn("1 placeholders", instructions)  # [placeholder]
+        self.assertIn("1 placeholder(s)", instructions)  # [placeholder]
         self.assertIn("2 ellipsis pattern", instructions)  # ... and etc
         self.assertIn("test", instructions.lower())
         self.assertIn("service", instructions.lower())

@@ -43,14 +43,26 @@ PLACEHOLDER_PATTERNS = [
     re.compile(r"\{place\s*holder\}", re.IGNORECASE),
     re.compile(r"\(\(place\s*holder\)\)", re.IGNORECASE),
     re.compile(r"\[\[place\s*holder\]\]", re.IGNORECASE),
-    re.compile(r"\bplace\s*holder\b", re.IGNORECASE),  # Plain "placeholder" or "place holder"
+    re.compile(
+        r"\bplace\s*holder\b", re.IGNORECASE
+    ),  # Plain "placeholder" or "place holder"
+]
+
+# Nameholder patterns - detect various nameholder formats for code symbols
+NAMEHOLDER_PATTERNS = [
+    re.compile(r"\$\{name\s*holder\}", re.IGNORECASE),  # ${nameholder}
+    re.compile(r"\"name\s*holder\"", re.IGNORECASE),  # "nameholder"
+    re.compile(r"'name\s*holder'", re.IGNORECASE),  # 'nameholder'
+    re.compile(
+        r"\bname\s*holder\b", re.IGNORECASE
+    ),  # Plain "nameholder" or "name holder"
 ]
 
 # Ellipsis patterns - indicate incomplete information
 ELLIPSIS_PATTERNS = [
-    re.compile(r"\.{3,}"),           # Three or more dots: ...
-    re.compile(r"…"),                 # Unicode ellipsis
-    re.compile(r"\betc\.?\b", re.IGNORECASE),        # "etc" or "etc."
+    re.compile(r"\.{3,}"),  # Three or more dots: ...
+    re.compile(r"…"),  # Unicode ellipsis
+    re.compile(r"\betc\.?\b", re.IGNORECASE),  # "etc" or "etc."
     re.compile(r"\band so on\b", re.IGNORECASE),
     re.compile(r"\band so forth\b", re.IGNORECASE),
 ]
@@ -66,6 +78,7 @@ TRIGGER_PATTERNS = [
 
 class ProjectContext(TypedDict):
     """Type definition for project context information."""
+
     project_files: List[str]
     common_dirs: List[str]
     project_name: str
@@ -109,15 +122,21 @@ def should_enhance_prompt(prompt: str) -> bool:
     """
     Determine if the prompt should be enhanced with file finding instructions.
     Returns True if the prompt contains patterns that indicate the user needs help
-    finding files (placeholders, ellipsis, or file/directory references).
+    finding files (placeholders, nameholders, ellipsis, or file/directory references).
 
-    Checks three categories of patterns:
+    Checks four categories of patterns:
     - PLACEHOLDER_PATTERNS: [placeholder], <placeholder>, etc.
+    - NAMEHOLDER_PATTERNS: ${nameholder}, "nameholder", etc.
     - ELLIPSIS_PATTERNS: ..., etc, and so on, etc.
     - TRIGGER_PATTERNS: in this file, to this directory, etc.
     """
     # Check all pattern lists for matches
-    all_patterns = PLACEHOLDER_PATTERNS + ELLIPSIS_PATTERNS + TRIGGER_PATTERNS
+    all_patterns = (
+        PLACEHOLDER_PATTERNS
+        + NAMEHOLDER_PATTERNS
+        + ELLIPSIS_PATTERNS
+        + TRIGGER_PATTERNS
+    )
 
     for pattern in all_patterns:
         if pattern.search(prompt):
@@ -187,7 +206,9 @@ def count_placeholders(prompt: str) -> int:
     # First, remove all formatted placeholders to avoid double-counting
     # when we check for plain "placeholder" word
     cleaned_prompt = prompt_lower
-    for pattern in PLACEHOLDER_PATTERNS[:-1]:  # All except the last (plain word) pattern
+    for pattern in PLACEHOLDER_PATTERNS[
+        :-1
+    ]:  # All except the last (plain word) pattern
         cleaned_prompt = pattern.sub("", cleaned_prompt)
 
     # Count formatted placeholders
@@ -202,6 +223,27 @@ def count_placeholders(prompt: str) -> int:
     return total_count
 
 
+def count_nameholders(prompt: str) -> int:
+    """
+    Count the number of nameholder tokens in the prompt.
+    Uses same logic as count_placeholders to avoid double-counting.
+    Supports various nameholder formats: ${nameholder}, "nameholder", 'nameholder', etc.
+    """
+    nameholder_count = 0
+    cleaned_prompt = prompt
+
+    # Remove formatted nameholders first (patterns 0-2: ${nameholder}, "nameholder", 'nameholder')
+    for pattern in NAMEHOLDER_PATTERNS[:3]:
+        cleaned_prompt = pattern.sub("", cleaned_prompt)
+        nameholder_count += len(pattern.findall(prompt))
+
+    # Count plain "nameholder" only in cleaned text
+    plain_pattern = NAMEHOLDER_PATTERNS[3]
+    nameholder_count += len(plain_pattern.findall(cleaned_prompt))
+
+    return nameholder_count
+
+
 def count_ellipsis(prompt: str) -> int:
     """
     Count the number of ellipsis patterns in the prompt.
@@ -213,9 +255,11 @@ def count_ellipsis(prompt: str) -> int:
     return total_count
 
 
-def generate_file_finding_instructions(prompt: str, project_context: ProjectContext) -> str:
+def generate_prompt_enhancing_instructions(
+    prompt: str, project_context: ProjectContext
+) -> str:
     """
-    Generate enhanced instructions for finding relevant files based on the prompt.
+    Generate enhanced instructions for finding relevant files and symbols based on the prompt.
     """
     base_instruction = "**The user prompt requires enhancement before you can proceed. Follow the below instructions for prompt enhancement:**\n"
 
@@ -251,7 +295,19 @@ def generate_file_finding_instructions(prompt: str, project_context: ProjectCont
         # Count number of placeholders in the prompt using compiled patterns
         placeholder_count = count_placeholders(prompt)
         suggestions.append(
-            f"There are {placeholder_count} placeholders in the prompt. All must be replaced with relevant file/directory paths."
+            f"There are {placeholder_count} placeholder(s) in the prompt. All must be replaced with relevant file/directory paths or ARN/URL/URI (e.g., database url, s3 url, http uri)."
+        )
+
+    # Handle nameholder-specific suggestions
+    if any(term in prompt_lower for term in ["nameholder", "name holder"]):
+        suggestions.append(
+            "Identify all nameholder in the prompt eg. ${nameholder}, \"nameholder\", 'nameholder', etc. Use the related keywords (before/after the nameholder) to search for relevant code symbols."
+        )
+
+        # Count number of nameholders in the prompt using compiled patterns
+        nameholder_count = count_nameholders(prompt)
+        suggestions.append(
+            f"There are {nameholder_count} nameholder(s) in the prompt. All must be replaced with the name of a symbol within this project repo (e.g., variable, constant, function, method, class, interface, type, etc.)."
         )
 
     # Handle ellipsis-specific suggestions (... or etc or and so on)
@@ -270,7 +326,8 @@ def generate_file_finding_instructions(prompt: str, project_context: ProjectCont
     # Add general search guidance
     general_guidance = [
         "Use the Glob tool to search for files by pattern (e.g., '**/*.ts', '**/*.go', '**/*.py')",
-        "Use the Grep tool to search for specific class, function, interface names",
+        "Use the Grep tool to search for specific class, function, interface names (e.g., 'class SymbolName', 'func SymbolName', 'def symbol_name', 'type InterfaceName interface')",
+        "Use the LSP tool (gopls, pyright, tsserver) that match the programming language of this repo to search for symbol definitions",
         "Check the project structure first with 'ls' or 'tree' commands if available",
     ]
 
@@ -319,9 +376,11 @@ def main() -> None:
             # Allow the prompt to proceed without enhancement
             sys.exit(0)
 
-        # Get project context and generate file finding instructions
+        # Get project context and generate prompt enhancing instructions
         project_context = get_project_context(cwd)
-        file_instructions = generate_file_finding_instructions(prompt, project_context)
+        file_instructions = generate_prompt_enhancing_instructions(
+            prompt, project_context
+        )
 
         # Output the additional context using the hook-specific format
         output = {

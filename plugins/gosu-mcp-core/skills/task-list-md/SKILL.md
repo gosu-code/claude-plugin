@@ -81,9 +81,22 @@ Task List MD CLI (`scripts/task_list_md.py`) parses hierarchical checklists, mai
 
 ### get-next-task
 
-`python3 scripts/task_list_md.py get-next-task [file]`
+`python3 scripts/task_list_md.py get-next-task [file] [--wait DURATION]`
 
-- Suggests the next actionable task: honors dependencies, prefers sub-tasks when the parent is `in-progress`, and surfaces context (dependencies, parent, sub-tasks).
+- Suggests the next actionable task from PENDING tasks only (excludes IN_PROGRESS tasks)
+- Honors dependencies and parent constraints
+- Prefers sub-tasks when the parent is `in-progress`
+- Surfaces context (dependencies, parent, sub-tasks)
+- Distinguishes between two scenarios:
+  - "All tasks have been completed!" - when all tasks are done/review
+  - "No tasks available to work on..." - when tasks exist but are blocked or in-progress/deferred
+- Optional `--wait DURATION` parameter:
+  - Waits for specified duration when no task is available
+  - Duration format: `30` (30 minutes), `30m` (30 minutes), `2h` (2 hours), `90s` (90 seconds)
+  - Units: `s` for seconds, `m` for minutes, `h` for hours (defaults to minutes if no unit specified)
+  - Periodically checks for available tasks (every 10 seconds)
+  - Automatically reloads task file to detect status changes
+  - Examples: `--wait 30m`, `--wait 2h`, `--wait 120s`
 
 ### check-dependencies
 

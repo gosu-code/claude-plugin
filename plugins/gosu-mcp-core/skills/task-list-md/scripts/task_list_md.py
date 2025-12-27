@@ -4,10 +4,56 @@ import json
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Optional, Dict, Set
+
+
+def parse_duration(duration_str: str) -> int:
+    """
+    Parse a duration string into seconds.
+
+    Accepts formats like:
+    - '30' -> 30 minutes (default unit)
+    - '30m' -> 30 minutes
+    - '2h' -> 2 hours
+    - '90s' -> 90 seconds
+
+    Args:
+        duration_str: Duration string with optional unit (s/m/h)
+
+    Returns:
+        Duration in seconds
+
+    Raises:
+        ValueError: If duration format is invalid
+    """
+    if not duration_str:
+        raise ValueError("Duration string cannot be empty")
+
+    # Extract number and unit
+    match = re.match(r'^(\d+)([smh]?)$', duration_str.strip())
+    if not match:
+        raise ValueError(
+            f"Invalid duration format: '{duration_str}'. "
+            "Expected format: number followed by optional unit (s/m/h). "
+            "Examples: '30', '30m', '2h', '90s'"
+        )
+
+    value = int(match.group(1))
+    unit = match.group(2) or 'm'  # Default to minutes if no unit specified
+
+    # Convert to seconds
+    if unit == 's':
+        return value
+    elif unit == 'm':
+        return value * 60
+    elif unit == 'h':
+        return value * 3600
+    else:
+        raise ValueError(f"Invalid time unit: '{unit}'. Must be 's', 'm', or 'h'")
 
 
 class Colors:
@@ -616,6 +662,138 @@ class TaskParser:
             current_task.full_content = "\n".join(task_content_lines)
             self.tasks[current_task.task_id] = current_task
 
+    def _reload_tasks(self):
+        """Reload tasks from the file (used during wait periods)"""
+        # Clear existing tasks
+        self.tasks.clear()
+        # Re-parse the file
+        self._parse_file()
+
+    def _find_candidate_tasks(self):
+        """
+        Find all candidate tasks that are pending and have dependencies satisfied.
+
+        Returns:
+            List of tuples (task_id, task) for tasks that can be worked on,
+            or None if all tasks are completed.
+        """
+        # First, check if all tasks are completed
+        all_completed = all(
+            task.status in [TaskStatus.DONE, TaskStatus.REVIEW]
+            for task in self.tasks.values()
+        )
+
+        if all_completed:
+            return None  # Signal that all tasks are completed
+
+        candidate_tasks = []
+        for task_id, task in self.tasks.items():
+            if task.status == TaskStatus.PENDING:
+                # Check if all dependencies are satisfied
+                dependencies_satisfied = True
+                for dep_id in task.dependencies:
+                    if dep_id not in self.tasks:
+                        dependencies_satisfied = False
+                        break
+                    dep_task = self.tasks[dep_id]
+                    if dep_task.status not in [TaskStatus.DONE, TaskStatus.REVIEW]:
+                        dependencies_satisfied = False
+                        break
+
+                # For sub-tasks, also check if parent allows progression
+                if self._is_sub_task(task_id):
+                    parent_id = self._get_parent_task_id(task_id)
+                    if parent_id and parent_id in self.tasks:
+                        parent_task = self.tasks[parent_id]
+                        # Sub-task can only be worked on if parent is not pending or done
+                        if parent_task.status in [TaskStatus.PENDING, TaskStatus.DONE]:
+                            dependencies_satisfied = False
+
+                if dependencies_satisfied:
+                    candidate_tasks.append((task_id, task))
+
+        return candidate_tasks
+
+    def _prioritize_tasks(self, candidate_tasks):
+        """
+        Prioritize tasks, preferring sub-tasks when their parent is in-progress.
+
+        Args:
+            candidate_tasks: List of tuples (task_id, task)
+
+        Returns:
+            Tuple of (task_id, task) for the highest priority task
+        """
+        # Separate sub-tasks from parent tasks
+        sub_tasks = [
+            (tid, task) for tid, task in candidate_tasks if self._is_sub_task(tid)
+        ]
+
+        # Prefer sub-tasks if their parent is in-progress
+        preferred_tasks = []
+        for tid, task in sub_tasks:
+            parent_id = self._get_parent_task_id(tid)
+            if (
+                parent_id
+                and parent_id in self.tasks
+                and self.tasks[parent_id].status == TaskStatus.IN_PROGRESS
+            ):
+                preferred_tasks.append((tid, task))
+
+        # If we have preferred sub-tasks, use them; otherwise use all candidates
+        if preferred_tasks:
+            candidate_tasks = preferred_tasks
+
+        # Sort by task ID to get the first one
+        candidate_tasks.sort(key=lambda x: self._sort_key(x[0]))
+        return candidate_tasks[0]
+
+    def _display_next_task(self, task_id, task):
+        """
+        Display the next task with its context (dependencies, parent, sub-tasks).
+
+        Args:
+            task_id: The task ID
+            task: The Task object
+        """
+        # Use colored status
+        if Colors.is_colors_enabled():
+            colored_status = Colors.colorize_status(task.status)
+        else:
+            colored_status = task.status.value
+
+        print(f"Next task to work on:")
+        print(f"ID {task_id} [{colored_status}]: {task.description}")
+
+        if task.dependencies:
+            print(f"Dependencies (all satisfied): {', '.join(task.dependencies)}")
+
+        # If this is a parent task with sub-tasks, show the sub-tasks
+        if self._has_sub_tasks(task_id):
+            sub_task_ids = self._get_sub_tasks(task_id)
+            print(f"\nSub-tasks:")
+            for sub_id in sub_task_ids:
+                sub_task = self.tasks[sub_id]
+                if Colors.is_colors_enabled():
+                    sub_colored_status = Colors.colorize_status(sub_task.status)
+                else:
+                    sub_colored_status = sub_task.status.value
+                print(f"    ID {sub_id} [{sub_colored_status}]: {sub_task.description}")
+
+        # If this is a sub-task, show the parent context
+        if self._is_sub_task(task_id):
+            parent_id = self._get_parent_task_id(task_id)
+            if parent_id and parent_id in self.tasks:
+                parent_task = self.tasks[parent_id]
+                if Colors.is_colors_enabled():
+                    parent_colored_status = Colors.colorize_status(parent_task.status)
+                else:
+                    parent_colored_status = parent_task.status.value
+                print(f"\nParent task:")
+                print(
+                    f"    ID {parent_id} [{parent_colored_status}]: {parent_task.description}"
+                )
+
     def list_tasks(self):
         """List all tasks with their status and ID"""
         if not self.tasks:
@@ -754,107 +932,67 @@ class TaskParser:
             if parent_id:
                 self._auto_update_parent_status(parent_id)
 
-    def get_next_task(self):
-        """Get the next task ID to work on, considering both parent tasks and sub-tasks"""
-        # Find tasks that are pending or in-progress
-        candidate_tasks = []
+    def get_next_task(self, wait_duration: Optional[int] = None):
+        """
+        Get the next task ID to work on, considering both parent tasks and sub-tasks.
 
-        for task_id, task in self.tasks.items():
-            if task.status in [TaskStatus.PENDING, TaskStatus.IN_PROGRESS]:
-                # Check if all dependencies are satisfied
-                dependencies_satisfied = True
-                for dep_id in task.dependencies:
-                    if dep_id not in self.tasks:
-                        dependencies_satisfied = False
-                        break
-                    dep_task = self.tasks[dep_id]
-                    if dep_task.status not in [TaskStatus.DONE, TaskStatus.REVIEW]:
-                        dependencies_satisfied = False
-                        break
+        Args:
+            wait_duration: Optional wait duration in seconds. If specified and no task is available,
+                          the method will wait and periodically check for available tasks.
+        """
+        start_time = time.time() if wait_duration else None
+        check_interval = 10  # Check every 10 seconds during wait
 
-                # For sub-tasks, also check if parent allows progression
-                if self._is_sub_task(task_id):
-                    parent_id = self._get_parent_task_id(task_id)
-                    if parent_id and parent_id in self.tasks:
-                        parent_task = self.tasks[parent_id]
-                        # Sub-task can only be worked on if parent is not pending or done
-                        if parent_task.status in [TaskStatus.PENDING, TaskStatus.DONE]:
-                            dependencies_satisfied = False
+        while True:
+            # Find candidate tasks
+            candidate_tasks = self._find_candidate_tasks()
 
-                if dependencies_satisfied:
-                    candidate_tasks.append((task_id, task))
+            # Check if all tasks are completed
+            if candidate_tasks is None:
+                print("All tasks have been completed! No more pending tasks.")
+                return
 
-        if not candidate_tasks:
-            print(
-                "No tasks available to work on (all dependencies not satisfied, parent constraints, or no pending/in-progress tasks)."
-            )
-            return
+            # If we found candidate tasks, break out of wait loop
+            if candidate_tasks:
+                break
 
-        # Prioritize sub-tasks over parent tasks when parent is in-progress
-        # First, separate parent tasks and sub-tasks
-        parent_tasks = [
-            (tid, task) for tid, task in candidate_tasks if not self._is_sub_task(tid)
-        ]
-        sub_tasks = [
-            (tid, task) for tid, task in candidate_tasks if self._is_sub_task(tid)
-        ]
-
-        # Prefer sub-tasks if their parent is in-progress
-        preferred_tasks = []
-        for tid, task in sub_tasks:
-            parent_id = self._get_parent_task_id(tid)
-            if (
-                parent_id
-                and parent_id in self.tasks
-                and self.tasks[parent_id].status == TaskStatus.IN_PROGRESS
-            ):
-                preferred_tasks.append((tid, task))
-
-        # If we have preferred sub-tasks, use them; otherwise use all candidates
-        if preferred_tasks:
-            candidate_tasks = preferred_tasks
-
-        # Sort by task ID to get the first one
-        candidate_tasks.sort(key=lambda x: self._sort_key(x[0]))
-        next_task_id, next_task = candidate_tasks[0]
-
-        # Use colored status
-        if Colors.is_colors_enabled():
-            colored_status = Colors.colorize_status(next_task.status)
-        else:
-            colored_status = next_task.status.value
-
-        print(f"Next task to work on:")
-        print(f"ID {next_task_id} [{colored_status}]: {next_task.description}")
-
-        if next_task.dependencies:
-            print(f"Dependencies (all satisfied): {', '.join(next_task.dependencies)}")
-
-        # If this is a parent task with sub-tasks, show the sub-tasks
-        if self._has_sub_tasks(next_task_id):
-            sub_task_ids = self._get_sub_tasks(next_task_id)
-            print(f"\nSub-tasks:")
-            for sub_id in sub_task_ids:
-                sub_task = self.tasks[sub_id]
-                if Colors.is_colors_enabled():
-                    sub_colored_status = Colors.colorize_status(sub_task.status)
-                else:
-                    sub_colored_status = sub_task.status.value
-                print(f"    ID {sub_id} [{sub_colored_status}]: {sub_task.description}")
-
-        # If this is a sub-task, show the parent context
-        if self._is_sub_task(next_task_id):
-            parent_id = self._get_parent_task_id(next_task_id)
-            if parent_id and parent_id in self.tasks:
-                parent_task = self.tasks[parent_id]
-                if Colors.is_colors_enabled():
-                    parent_colored_status = Colors.colorize_status(parent_task.status)
-                else:
-                    parent_colored_status = parent_task.status.value
-                print(f"\nParent task:")
+            # No tasks available - check if we should wait
+            if wait_duration is None:
                 print(
-                    f"    ID {parent_id} [{parent_colored_status}]: {parent_task.description}"
+                    "No tasks available to work on (dependencies not satisfied, parent constraints, or all other tasks are in-progress/deferred)."
                 )
+                return
+
+            # Calculate elapsed and remaining time
+            elapsed = time.time() - start_time
+            remaining = wait_duration - elapsed
+
+            if remaining <= 0:
+                # Wait duration expired
+                print(
+                    "No tasks available to work on (dependencies not satisfied, parent constraints, or all other tasks are in-progress/deferred)."
+                )
+                print(f"Wait duration of {wait_duration}s expired.")
+                return
+
+            # Show wait message
+            if elapsed < check_interval:  # Only show on first iteration
+                print(
+                    f"No tasks currently available. Waiting up to {wait_duration}s for tasks to become available..."
+                )
+
+            # Wait for check_interval or remaining time, whichever is smaller
+            sleep_time = min(check_interval, remaining)
+            time.sleep(sleep_time)
+
+            # Reload tasks from file to check for updates
+            self._reload_tasks()
+
+        # Prioritize and select the next task
+        next_task_id, next_task = self._prioritize_tasks(candidate_tasks)
+
+        # Display the next task with context
+        self._display_next_task(next_task_id, next_task)
 
     def validate_dependencies(self):
         """Validate all task dependencies"""
@@ -2120,6 +2258,12 @@ def main():
         default="",
         help="Path to the markdown file containing tasks. If not specified, automatically selects the most recently modified file from .tasks.local.json",
     )
+    next_parser.add_argument(
+        "--wait",
+        type=str,
+        default=None,
+        help="Wait duration when no task is available (e.g., '30m', '2h', '90s'). Units: s=seconds, m=minutes, h=hours. Defaults to minutes if no unit specified.",
+    )
 
     # Check dependencies command
     validate_parser = subparsers.add_parser(
@@ -2378,7 +2522,14 @@ def main():
     elif args.command == "delete-task":
         task_parser.delete_task(args.task_ids)
     elif args.command == "get-next-task":
-        task_parser.get_next_task()
+        wait_duration = None
+        if args.wait:
+            try:
+                wait_duration = parse_duration(args.wait)
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        task_parser.get_next_task(wait_duration=wait_duration)
     elif args.command == "check-dependencies":
         task_parser.validate_dependencies()
     elif args.command == "show-progress":
