@@ -42,25 +42,26 @@ from test_update_task import TestUpdateTaskCommand
 def create_test_suite():
     """Create comprehensive test suite"""
     suite = unittest.TestSuite()
+    loader = unittest.TestLoader()
 
     # Add CLI command tests
-    suite.addTest(unittest.makeSuite(TestTaskListMDCLI))
+    suite.addTests(loader.loadTestsFromTestCase(TestTaskListMDCLI))
 
     # Add TaskParser tests
-    suite.addTest(unittest.makeSuite(TestTaskParser))
-    suite.addTest(unittest.makeSuite(TestProgressTracker))
+    suite.addTests(loader.loadTestsFromTestCase(TestTaskParser))
+    suite.addTests(loader.loadTestsFromTestCase(TestProgressTracker))
 
     # Add error handling tests
-    suite.addTest(unittest.makeSuite(TestErrorHandling))
+    suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
 
     # Add track-progress tests
-    suite.addTest(unittest.makeSuite(TestTrackProgress))
+    suite.addTests(loader.loadTestsFromTestCase(TestTrackProgress))
 
     # Add auto file selection tests
-    suite.addTest(unittest.makeSuite(TestAutoFileSelection))
+    suite.addTests(loader.loadTestsFromTestCase(TestAutoFileSelection))
 
     # Add update-task command tests
-    suite.addTest(unittest.makeSuite(TestUpdateTaskCommand))
+    suite.addTests(loader.loadTestsFromTestCase(TestUpdateTaskCommand))
 
     return suite
 
@@ -72,18 +73,16 @@ def run_tests(verbosity=2):
 
     # Create test runner
     runner = unittest.TextTestRunner(
-        verbosity=verbosity,
-        stream=sys.stdout,
-        buffer=True
+        verbosity=verbosity, stream=sys.stdout, buffer=True
     )
 
     # Run tests
     result = runner.run(suite)
 
     # Print summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"Tests run: {result.testsRun}")
     print(f"Failures: {len(result.failures)}")
     print(f"Errors: {len(result.errors)}")
@@ -99,7 +98,15 @@ def run_tests(verbosity=2):
         for test, traceback in result.errors:
             print(f"  - {test}")
 
-    success_rate = ((result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun * 100) if result.testsRun > 0 else 0
+    success_rate = (
+        (
+            (result.testsRun - len(result.failures) - len(result.errors))
+            / result.testsRun
+            * 100
+        )
+        if result.testsRun > 0
+        else 0
+    )
     print(f"\nSuccess rate: {success_rate:.1f}%")
 
     if result.wasSuccessful():
@@ -112,10 +119,20 @@ def run_tests(verbosity=2):
 
 if __name__ == "__main__":
     # Check if script exists before running tests
-    script_path = Path(__file__).parent.parent.parent.parent / "plugins" / "gosu-mcp-core" / "skills" / "task-list-md" / "scripts" / "task_list_md.py"
+    script_path = (
+        Path(__file__).parent.parent.parent.parent
+        / "plugins"
+        / "gosu-mcp-core"
+        / "skills"
+        / "task-list-md"
+        / "scripts"
+        / "task_list_md.py"
+    )
     if not script_path.exists():
         print(f"❌ Error: Script not found at {script_path}")
-        print("Please ensure the task_list_md.py script exists in src/scripts/task_list_md/")
+        print(
+            "Please ensure the task_list_md.py script exists in src/scripts/task_list_md/"
+        )
         sys.exit(1)
 
     # Parse command line arguments

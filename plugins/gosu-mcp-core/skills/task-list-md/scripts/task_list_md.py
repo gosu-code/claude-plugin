@@ -34,7 +34,7 @@ def parse_duration(duration_str: str) -> int:
         raise ValueError("Duration string cannot be empty")
 
     # Extract number and unit
-    match = re.match(r'^(\d+)([smh]?)$', duration_str.strip())
+    match = re.match(r"^(\d+)([smh]?)$", duration_str.strip())
     if not match:
         raise ValueError(
             f"Invalid duration format: '{duration_str}'. "
@@ -43,14 +43,14 @@ def parse_duration(duration_str: str) -> int:
         )
 
     value = int(match.group(1))
-    unit = match.group(2) or 'm'  # Default to minutes if no unit specified
+    unit = match.group(2) or "m"  # Default to minutes if no unit specified
 
     # Convert to seconds
-    if unit == 's':
+    if unit == "s":
         return value
-    elif unit == 'm':
+    elif unit == "m":
         return value * 60
-    elif unit == 'h':
+    elif unit == "h":
         return value * 3600
     else:
         raise ValueError(f"Invalid time unit: '{unit}'. Must be 's', 'm', or 'h'")
@@ -947,16 +947,45 @@ class TaskParser:
             # Find candidate tasks
             candidate_tasks = self._find_candidate_tasks()
 
-            # Check if all tasks are completed
+            # Scenario 1: All tasks are completed (candidate_tasks is None)
             if candidate_tasks is None:
-                print("All tasks have been completed! No more pending tasks.")
-                return
+                # If no wait_duration specified, return immediately
+                if wait_duration is None:
+                    print("All tasks have been completed! No more pending tasks.")
+                    return
 
-            # If we found candidate tasks, break out of wait loop
+                # Calculate elapsed and remaining time
+                elapsed = time.time() - start_time
+                remaining = wait_duration - elapsed
+
+                if remaining <= 0:
+                    # Wait duration expired
+                    print("All tasks have been completed! No more pending tasks.")
+                    print(f"Wait duration of {wait_duration}s expired.")
+                    return
+
+                # Show wait message
+                if elapsed < check_interval:  # Only show on first iteration
+                    print(
+                        "All tasks completed. Waiting up to {:.1f}s for new tasks to be added...".format(
+                            remaining
+                        )
+                    )
+
+                # Wait for check_interval or remaining time, whichever is smaller
+                sleep_time = min(check_interval, remaining)
+                time.sleep(sleep_time)
+
+                # Reload tasks from file to check for updates
+                self._reload_tasks()
+                continue
+
+            # Scenario 2: Found candidate tasks - break out and return the next task
             if candidate_tasks:
                 break
 
-            # No tasks available - check if we should wait
+            # Scenario 3: No tasks available (empty list - pending tasks exist but blocked by dependencies/constraints)
+            # If no wait_duration specified, return immediately
             if wait_duration is None:
                 print(
                     "No tasks available to work on (dependencies not satisfied, parent constraints, or all other tasks are in-progress/deferred)."
@@ -978,7 +1007,7 @@ class TaskParser:
             # Show wait message
             if elapsed < check_interval:  # Only show on first iteration
                 print(
-                    f"No tasks currently available. Waiting up to {wait_duration}s for tasks to become available..."
+                    f"No tasks currently available (blocked by dependencies/constraints). Waiting up to {wait_duration}s for tasks to become available..."
                 )
 
             # Wait for check_interval or remaining time, whichever is smaller

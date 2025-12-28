@@ -12,8 +12,10 @@ Analyze the conversation and determine if:
 3. Any follow-up work is needed?
 4. The user-requested Goal is achieved or not?
 
-## Response Format
+You MUST write a report in markdown format in `docs/reports/` dir which contain the answers for all above questions.
+Use file name in this format `gdd-stop-eval-report-$(date).md`.
 
+<response>
 You must respond with a JSON following this format:
 
 ```json
@@ -24,8 +26,7 @@ You must respond with a JSON following this format:
 ```
 
 You MUST response only with a valid JSON (do not contain comments) and nothing else.
-
-## Samples Response
+Below is some sample responses:
 
 If you think Claude should stop working (no more pending task), response as follow:
 
@@ -44,3 +45,14 @@ If you think there is a pending task need to be done before Claude can stop, res
   "reason": "I found a pending task that need to be completed. Here is the details ...",
 }
 ```
+
+If you think the user-requested Goal must be achieved before Claude can stop, response as follow:
+
+```json
+{
+  "decision": "block",
+  "reason": "The user-requested Goal is not achieved. Please continue to work target the goal defined in ...",
+}
+```
+
+</response>
