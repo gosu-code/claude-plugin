@@ -18,7 +18,7 @@
 # Source: http://opensource.org/licenses/AGPL-3.0
 # ------------------- LICENSE -------------------
 
-# Script to run Claude Code CLI with MCP tools in a background session via tmux
+# Helper script to run Claude Code CLI with all MCP & tools
 # Will support other AI coding agent CLI in the future
 # Usage:
 #   scripts/run_ai_coding_agent.sh [-u agent_user_name] [--yolo] [-r session_id] [task_prompt]
@@ -123,7 +123,7 @@ else
     fi
     
     # Base allowed tools
-    BASE_TOOLS="Task, Bash, Glob, Grep, Read, Edit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch, BashOutput, KillShell, SlashCommand, ListMcpResourcesTool, ReadMcpResourceTool"
+    BASE_TOOLS="Task, Bash, Glob, Grep, Read, Edit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch, BashOutput, KillShell, AskUserQuestion, Skill, SlashCommand, ListMcpResourcesTool, ReadMcpResourceTool"
     
     # Combine base tools with MCP tools
     if [ -n "$MCP_TOOLS" ]; then
@@ -138,13 +138,6 @@ fi
 
 # Working directory is always current directory
 WORKING_DIR="$(pwd)"
-
-# Generate unique session name based on timestamp
-SESSION_NAME="claude-agent-$(date +%s)"
-
-# Create tmux socket directory
-TMUX_SOCKET_DIR="/tmp/tmux-0"
-mkdir -p "$TMUX_SOCKET_DIR"
 
 # Prepare resume/continue options
 RESUME_OPTS=""
@@ -174,19 +167,8 @@ else
 fi
 
 # Start new session in current directory
-echo "Starting tmux session with command:"
+echo "Starting a claude session with command:"
 echo "$CLAUDE_CMD"
 echo ""
-
-tmux -S "$TMUX_SOCKET_DIR/ai-coding-agent" new -d -s "$SESSION_NAME" "$CLAUDE_CMD"
-
-echo "Agent session '$SESSION_NAME' started successfully!"
-echo ""
-echo "To attach to the session:"
-echo "  tmux -S $TMUX_SOCKET_DIR/ai-coding-agent attach -t $SESSION_NAME"
-echo ""
-echo "To check session status:"
-echo "  tmux -S $TMUX_SOCKET_DIR/ai-coding-agent list-sessions"
-echo ""
-echo "To view output (when finish):"
-echo "  cat $WORKING_DIR/agent-$SESSION_NAME.log"
+# Execute
+bash -c "$CLAUDE_CMD"

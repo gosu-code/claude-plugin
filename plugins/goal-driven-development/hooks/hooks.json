@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Use skill 'gdd-stop-hook-prompt' to evaluate if Claude should stop"
+          }
+        ]
+      }
+    ]
+  }
+}
