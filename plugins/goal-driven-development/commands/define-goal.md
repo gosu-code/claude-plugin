@@ -147,11 +147,11 @@ These constraints define the hard boundaries for achieving the goal "<Goal Name 
 
 <!-- What constitutes a safe, acceptable change? -->
 
-- [ ] All existing tests pass
-- [ ] New tests added for new functionality
-- [ ] No breaking API changes
-- [ ] Code review completed
-- [ ] Documentation updated
+- All existing tests pass (both unit-test and integration-test)
+- New tests added for new functionality
+- No breaking API changes
+- Code review completed and all feedback are addressed
+- Documentation updated to reflect new functionality
 
 ## Additional Constraints
 
