@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Use skill 'gdd-stop-hook-prompt' to evaluate if Claude should stop",
+            "prompt": "You are evaluating whether Claude should stop working.\r\nAnalyze the conversation and determine if:\r\n\r\n1. All user-requested tasks are complete or not?\r\n2. Any errors need to be addressed?\r\n3. Any follow-up work is needed?\r\n4. The user-requested Goal is achieved or not?\r\n\r\n<response>\r\nYou must respond with a JSON following this format:\r\n\r\n```json\r\n{\r\n  \"decision\": \"approve\" | \"block\",\r\n  \"reason\": \"Explanation for the decision\",\r\n}\r\n```\r\n\r\nYou MUST response only with a valid JSON (do not contain comments) and nothing else.\r\n\r\n## Samples Response\r\n\r\nIf you think Claude should stop working (no more pending task), response as follow:\r\n\r\n```json\r\n{\r\n  \"decision\": \"approve\",\r\n  \"reason\": \"\"\r\n}\r\n```\r\n\r\nIf you think there is a pending task need to be done before Claude can stop, response as follow:\r\n\r\n```json\r\n{\r\n  \"decision\": \"block\",\r\n  \"reason\": \"I found a pending task that need to be completed. Here is the details ...\",\r\n}\r\n```\r\n<\/response>",
             "timeout": 120
           }
         ]
