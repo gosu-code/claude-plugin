@@ -8,6 +8,7 @@ Create a new goal directory structure for Goal Driven Development (GDD). Usage: 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions below and stop:
+
 ```
 Usage: /define-goal <goal-name>
 
@@ -47,8 +48,9 @@ The goal name should be lowercase with hyphens (kebab-case).
 
 2. If the directory exists:
    - Display warning: "Goal '<goal-name>' already exists at docs/goal/<goal-name>/"
-   - Ask user if they want to view the existing goal or create a new one with a different name
-   - Stop execution
+   - Use `AskUserQuestion` tool to ask user if they want to update the existing goal or create a new one with a different name
+      - If user choose update the existing goal, skip Phase 3 and go to Phase 4.
+      - If user specified a different name for <goal-name>, repeat this Phase 2 with the new <goal-name>
 
 ### Phase 3: Create Goal Directory Structure
 
@@ -57,9 +59,9 @@ The goal name should be lowercase with hyphens (kebab-case).
 2. Create `goal.md` with the following template:
 
 ```markdown
-# Goal: <Goal Name (Title Case)>
+# Goal
 
-> Created: <current date YYYY-MM-DD>
+<Goal Name (Title Case)>
 
 ## Vision
 
@@ -81,21 +83,13 @@ Example: "Make this payments service reliable and easy to change."
 
 ## Scope
 
-<!-- What is in scope? What is explicitly out of scope? -->
-
 ### In Scope
 
--
+<!-- What is in scope? -->
 
 ### Out of Scope
 
--
-
-## Related Goals
-
-<!-- Link to any related or dependent goals -->
-
-- None
+<!-- What is explicitly out of scope? -->
 
 ---
 
@@ -105,11 +99,9 @@ Example: "Make this payments service reliable and easy to change."
 3. Create `constraints.md` with the following template:
 
 ```markdown
-# Constraints: <Goal Name (Title Case)>
+# Constraints
 
-> Last Updated: <current date YYYY-MM-DD>
-
-These constraints define the hard boundaries for achieving the goal defined in [goal.md](./goal.md).
+These constraints define the hard boundaries for achieving the goal "<Goal Name (Title Case)>" defined in [goal.md](./goal.md).
 
 ## Tech Stack & Libraries
 
@@ -139,7 +131,7 @@ These constraints define the hard boundaries for achieving the goal defined in [
 
 ## Performance Targets
 
-<!-- Optional: Specific performance requirements -->
+<!-- Optional: Specific performance requirements. -->
 
 | Metric | Target | Current |
 |--------|--------|---------|
@@ -172,31 +164,31 @@ These constraints define the hard boundaries for achieving the goal defined in [
 *These constraints are part of the Goal Driven Development (GDD) process.*
 ```
 
-### Phase 4: Confirm Creation
+### Phase 4: Interactive Goal Defining
 
-1. Display success message:
-   ```
-   Goal '<goal-name>' created successfully!
+1. **Interactive Prompt for Goal**
+   - Go through `docs/goal/<goal-name>/goal.md` and use `AskUserQuestion` tool to ask and let user filling in the missing information in the goal file.
+   - All sections must be filled with good enough information. You must analyze user response to your questions and ask for clarification until you have good enough info to update the goal file
+   - Update the goal file and use Code editor to open `docs/goal/<goal-name>/goal.md` so the user can review it.
+   - Proceed to next step only when user happy with the goal definition.
 
-   Created files:
-     - docs/goal/<goal-name>/goal.md
-     - docs/goal/<goal-name>/constraints.md
+2. **Interactive Prompt for Constrains (Optional)**:
+   - Go through `docs/goal/<goal-name>/constraints.md` and use `AskUserQuestion` tool to ask and let user filling in the missing information in the constrains file.
+   - All sections here are optional, MUST allow user to skip them during the interactive process.
+   - Update the constrains file and use Code editor to open `docs/goal/<goal-name>/constraints.md` so the user can review it.
+   - Proceed to next step only when user happy with the constrains.
 
-   Next steps:
-     1. Edit docs/goal/<goal-name>/goal.md to define your goal
-     2. Edit docs/goal/<goal-name>/constraints.md to set your constraints
-     3. Run /analyze-repo to generate a repository snapshot
-     4. Run /generate-tasks to create your first task set
-   ```
-
-2. Open the goal.md file for the user to review
+3. **Notify Success**:
+   - Print a message confirming the goal structure has been created.
+   - List the paths of the created/updated files:
+     - `docs/goal/<goal-name>/goal.md`
+     - `docs/goal/<goal-name>/constraints.md`
 
 ## Output Directory
 
 - All goal files are created in `docs/goal/<goal-name>/`
+- Create directories as needed if not yet exist.
 
 ## Interactions With Other Commands
 
-- `/analyze-repo` - Analyzes the repository to create a snapshot (working state)
-- `/generate-tasks` - Generates a task set based on the goal and current repository state
-- `/list-goals` - Lists all defined goals
+- No interactions
