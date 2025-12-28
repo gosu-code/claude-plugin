@@ -1,5 +1,6 @@
 ---
 name: "generate-tasks"
+argument-hint: <goal-name> [--help]
 description: "Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal"
 arguments:
   - name: "goal-name"
@@ -154,7 +155,37 @@ The goal name should match an existing goal directory created by /define-goal.
      - What dependencies exist between potential tasks
      - **What's NOT already covered by existing tasks** (avoid duplication)
 
-3. **Generate Small, Specific, Actionable Tasks** (Maximum 5 NEW tasks):
+3. **Evaluate Goal Achievement Status**:
+
+   **CRITICAL**: Before generating any tasks, evaluate if the goal is already achieved.
+
+   - **Compare Current State vs Success Criteria**:
+     - Review each success criterion from goal.md
+     - Based on Explore subagent findings, determine if each criterion is:
+       - ✅ **Fully Satisfied**: Current implementation meets this criterion completely
+       - 🟡 **Partially Satisfied**: Some progress, but gaps remain
+       - ❌ **Not Satisfied**: Criterion not met or significant work needed
+
+   - **Assess Improvement Potential**:
+     - For each satisfied criterion, check if meaningful improvements are still possible
+     - Consider if improvements would provide significant value vs being marginal tweaks
+     - Evaluate if improvements align with constraints and "safe change" definition
+
+   - **Decision Point**:
+     - **If ALL success criteria are fully satisfied AND no meaningful improvements are possible**:
+       - Stop task generation immediately
+       - Display congratulatory message: "🎉 Congratulations! All success criteria for goal `<goal-name>` are already satisfied!"
+       - Show summary of satisfied criteria
+       - Suggest user review the goal or define a new goal
+       - **Exit command - DO NOT generate any tasks**
+
+     - **If ANY success criteria are not satisfied OR meaningful improvements are possible**:
+       - Continue to task generation (next step)
+       - Prioritize tasks based on which criteria need the most work
+
+4. **Generate Small, Specific, Actionable Tasks** (Maximum 5 NEW tasks):
+
+   **NOTE**: This step is only reached if Step 3 determined that tasks are still needed (i.e., not all success criteria are satisfied).
 
    **IMPORTANT**: If tasks.md already exists, generate NEW tasks that complement existing ones. Do NOT duplicate existing tasks.
 
@@ -207,8 +238,10 @@ The goal name should match an existing goal directory created by /define-goal.
      - Follows the "Definition of Safe Change" (tests, reviews, documentation)
      - Is grounded in actual code locations (not hypothetical)
      - **Is NOT a duplicate of any existing task** (critical requirement)
+     - **Addresses unsatisfied or partially satisfied success criteria** (from Step 3 evaluation)
 
    - Prioritize tasks by:
+     - **Which success criteria are not yet satisfied** (highest priority)
      - Impact on success criteria (even small tasks should move the needle)
      - Findings from Explore subagent (quick wins, high-impact areas)
      - Dependencies between tasks (discovered during exploration)
@@ -227,7 +260,9 @@ The goal name should match an existing goal directory created by /define-goal.
    - "Make the app faster" (no clear expectations, no specific code locations)
    - "Add better logging" (no specific files or functions mentioned)
 
-4. **Create or Update Task File**:
+5. **Create or Update Task File**:
+
+   **NOTE**: This step is only reached if tasks were generated in Step 4.
 
    **Case 1: tasks.md does NOT exist** (creating new file):
    - Generate task list markdown file following the task-list-creation-guideline format
@@ -240,6 +275,7 @@ The goal name should match an existing goal directory created by /define-goal.
    - Ensure clear task structure with CONCRETE details:
      - Task ID and title
      - Description with context (reference actual files/functions from exploration)
+     - **Which success criterion this task addresses** (link to specific criterion from goal.md)
      - Specific implementation approach (based on discovered architecture)
      - Acceptance criteria (testable, measurable)
      - Dependencies (if any, based on code analysis)
@@ -276,12 +312,15 @@ The goal name should match an existing goal directory created by /define-goal.
 
 2. **Confirm Task Alignment**:
    - Display summary showing:
+     - **Goal Achievement Status**: Show which success criteria are satisfied vs not satisfied
      - **If new file**: Number of tasks generated (max 5)
      - **If existing file**: Number of NEW tasks added (max 5) + total task count
      - Which success criteria each task addresses
      - Any constraints being respected
      - Task file location
      - Confirmation that no duplicates were added (if tasks.md existed)
+
+   - **If goal is already achieved**: Display congratulatory message and skip task generation (handled in Phase 2, Step 3)
 
    - Ask user to review the tasks and confirm they align with the goal
 
@@ -297,9 +336,8 @@ The goal name should match an existing goal directory created by /define-goal.
 
 - **Prerequisite**: `/define-goal <goal-name>` must be run first to create the goal definition
 - **Next Steps**: After task generation, inform user they can:
-  - Execute tasks using: `/gosu:task-list-md-execute (MCP) complete milestone 1 --task-file [path-to-tasks-file] --max-tasks 3`
-  - Review goal progress by comparing completed tasks against success criteria
-  - Generate new task batches as previous tasks are completed
+  - Review the newly created tasks against the target Goal definition
+  - Setup Stop hook using slash command: `/setup-hook <goal-name>` this hook will force Claude to work autonomously until the target Goal is achieved.
 
 ## Interactions With Claude Subagents
 
@@ -307,10 +345,11 @@ The goal name should match an existing goal directory created by /define-goal.
 
 ## Key Principles
 
-1. **Small Scope**: Tasks must be completable in a single focused work session (2-4 hours)
-2. **Specific**: Concrete deliverables with well-defined boundaries, no vague language
-3. **Actionable**: Clear implementation path, not research-only unless producing concrete output
-4. **Clear Expectations**: Unambiguous acceptance criteria and measurable success
-5. **Goal-Focused**: Every task must contribute to achieving defined success criteria
-6. **Constraint-Aware**: All tasks must respect the boundaries set in constraints.md
-7. **Safe**: Follow the "Definition of Safe Change" to ensure quality and stability
+1. **Achievement-Aware**: Always check if goal success criteria are already satisfied before generating tasks
+2. **Small Scope**: Tasks must be completable in a single focused work session (2-4 hours)
+3. **Specific**: Concrete deliverables with well-defined boundaries, no vague language
+4. **Actionable**: Clear implementation path, not research-only unless producing concrete output
+5. **Clear Expectations**: Unambiguous acceptance criteria and measurable success
+6. **Goal-Focused**: Every task must contribute to achieving the goal defined success criteria
+7. **Constraint-Aware**: All tasks must respect the boundaries set in constraints.md
+8. **Safe**: Follow the "Definition of Safe Change" to ensure quality and stability

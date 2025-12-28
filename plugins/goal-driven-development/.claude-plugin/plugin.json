@@ -1,7 +1,7 @@
 {
   "name": "goal-driven-development",
   "description": "Goal Driven Development (GDD) plugin for managing long-term goals, constraints, and generating actionable task sets",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": {
     "name": "Gosu Team",
     "email": "0xgosu@gmail.com"

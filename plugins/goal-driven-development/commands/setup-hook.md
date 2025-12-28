@@ -13,7 +13,7 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
 ```
 Usage: /setup-hook <goal-name> [--remove]
 
-Sets up or removes a Stop hook in ~/.claude/settings.local.json that will
+Sets up or removes a Stop hook in .claude/settings.local.json that will
 automatically prompt for the next task from docs/goal/<goal-name>/tasks.md
 when you stop or pause your conversation with Claude.
 
@@ -84,7 +84,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 ### Phase 3: Modify settings.local.json
 
 1. **Determine settings file path**:
-   - Target file: `~/.claude/settings.local.json`
+   - Target file: `.claude/settings.local.json`
    - Expand tilde to user's home directory
 
 2. **Read or initialize settings**:
@@ -99,7 +99,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 
 3. **Create backup** (before any modifications):
    - If file exists, create a backup
-   - Backup location: `~/.claude/settings.local.json.backup`
+   - Backup location: `.claude/settings.local.json.backup`
    - Include timestamp in backup for safety
 
 4. **Check current hook status**:
@@ -133,7 +133,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
            "hooks": [
              {
                "type": "command",
-               "command": "echo '{\"decision\":\"block\",\"reason\":\"Must run the following command `${CLAUDE_PLUGIN_ROOT}\/skills\/task-list-md\/scripts\/task_list_md.py get-next-task --wait 60m docs\/goal\/<goal-name>\/tasks.md`.Do not attempt to kill\/abort the python script command. Do not read\/update the task file directly by yourself. You must patiently wait for the next task assignment from the `task_list_md.py get-next-task --wait 60m` command output.\"}'",
+               "command": "echo '{\"decision\":\"block\",\"reason\":\"Must run the following command ${CLAUDE_PLUGIN_ROOT}\/skills\/task-list-md\/scripts\/task_list_md.py get-next-task --wait 60m docs\/goal\/<goal-name>\/tasks.md (Do not attempt to kill\/abort the python script command. Do not read\/update the task file directly by yourself). You must patiently wait for the next task assignment from the task_list_md.py get-next-task --wait 60m command output.\"}'",
                "timeout": 10
              }
            ]
@@ -156,7 +156,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 
 6. **Write updated settings**:
    - Convert the JSON object back to formatted JSON string
-   - Write to `~/.claude/settings.local.json`
+   - Write to `.claude/settings.local.json`
    - Ensure proper file permissions (readable/writable by user)
 
 ### Phase 4: Verify and Confirm
@@ -164,12 +164,12 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 1. **Verify the operation succeeded**:
 
    **If REMOVE_MODE = true**:
-   - Re-read the `~/.claude/settings.local.json` file (if it exists)
+   - Re-read the `.claude/settings.local.json` file (if it exists)
    - Confirm the Stop hook for this goal no longer exists
    - If verification fails, display error and stop
 
    **If REMOVE_MODE = false**:
-   - Re-read the `~/.claude/settings.local.json` file
+   - Re-read the `.claude/settings.local.json` file
    - Confirm the Stop hook exists and contains the correct command
    - Confirm the goal name is correctly embedded in the command
    - If verification fails, display error and stop
@@ -182,8 +182,8 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
    ✓ Stop hook removed successfully for goal '<goal-name>'
 
    Details:
-   - Location: ~/.claude/settings.local.json
-   - Backup saved: ~/.claude/settings.local.json.backup
+   - Location: .claude/settings.local.json
+   - Backup saved: .claude/settings.local.json.backup
 
    The hook will no longer activate when you stop or pause conversations.
 
@@ -197,7 +197,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
    ✓ Stop hook configured successfully for goal '<goal-name>'
 
    Hook details:
-   - Location: ~/.claude/settings.local.json
+   - Location: .claude/settings.local.json
    - Task file: docs/goal/<goal-name>/tasks.md
    - Wait timeout: 60 seconds
 
@@ -220,8 +220,8 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 
 ## Output Directory
 
-- Configuration file: `~/.claude/settings.local.json`
-- Backup file (if created): `~/.claude/settings.local.json.backup`
+- Configuration file: `.claude/settings.local.json`
+- Backup file (if created): `.claude/settings.local.json.backup`
 
 ## Interactions With Other Commands
 
@@ -233,7 +233,6 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
   - No prerequisites (can remove hook even if goal or tasks don't exist)
 
 - **Related Commands**:
-  - After setup, use `/stop` or `/pause` to trigger the hook
   - Use `/generate-tasks <goal-name>` to add more tasks as you progress
   - Use `/setup-hook <goal-name> --remove` to disable the hook when switching goals
 

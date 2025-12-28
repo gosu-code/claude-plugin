@@ -114,20 +114,21 @@ These constraints define the hard boundaries for achieving the goal "<Goal Name 
 | Database | | |
 | Libraries | | |
 
-## Timeline & Cadence
+## Git & Cadence
 
-<!-- Development timeline and iteration cadence -->
+<!-- Git commit strategy and iteration cadence -->
 
-- **Target Completion**:
-- **Review Cadence**:
-- **Check-in Frequency**:
+- **Git Branching Strategy**:
+- **Git Commit Frequency**:
+- **OKR Review Cadence**:
+- **Human Executive Check-in Frequency**:
 
 ## Security & Compliance
 
 <!-- Security requirements and compliance rules that must be followed -->
 
-- [ ] Requirement 1
-- [ ] Requirement 2
+- Requirement 1
+- Requirement 2
 
 ## Performance Targets
 
@@ -147,11 +148,11 @@ These constraints define the hard boundaries for achieving the goal "<Goal Name 
 
 <!-- What constitutes a safe, acceptable change? -->
 
-- All existing tests pass (both unit-test and integration-test)
-- New tests added for new functionality
-- No breaking API changes
-- Code review completed and all feedback are addressed
-- Documentation updated to reflect new functionality
+- ✅ All existing tests pass (both unit-test and integration-test)
+- ✅ New tests added for new functionality
+- ✅ No breaking API changes
+- ✅ Code review completed and all feedback are addressed
+- ✅ Documentation updated to reflect new functionality
 
 ## Additional Constraints
 
@@ -191,4 +192,6 @@ These constraints define the hard boundaries for achieving the goal "<Goal Name 
 
 ## Interactions With Other Commands
 
-- No interactions
+- **Next Steps**: After goal definition, inform user they can:
+  - Review the newly created goal and constrains
+  - Generate tasks for Claude using slash command: `/generate-tasks <goal-name>`
