@@ -153,16 +153,16 @@ fi
 if [ "$YOLO_MODE" = true ]; then
     # YOLO mode: use --dangerously-skip-permissions and skip --allowedTools
     if [ -n "$AGENT_USER" ]; then
-        CLAUDE_CMD="runuser -u \"$AGENT_USER\" -- claude --dangerously-skip-permissions $RESUME_OPTS -p \"$TASK_PROMPT\" >& agent-$SESSION_NAME.log"
+        CLAUDE_CMD="runuser -u \"$AGENT_USER\" -- claude --dangerously-skip-permissions $RESUME_OPTS -p \"$TASK_PROMPT\""
     else
-        CLAUDE_CMD="claude --dangerously-skip-permissions $RESUME_OPTS -p \"$TASK_PROMPT\" >& agent-$SESSION_NAME.log"
+        CLAUDE_CMD="claude --dangerously-skip-permissions $RESUME_OPTS -p \"$TASK_PROMPT\""
     fi
 else
     # Normal mode: use --allowedTools
     if [ -n "$AGENT_USER" ]; then
-        CLAUDE_CMD="runuser -u \"$AGENT_USER\" -- claude --allowedTools \"$ALLOWED_TOOLS\" $RESUME_OPTS -p \"$TASK_PROMPT\" >& agent-$SESSION_NAME.log"
+        CLAUDE_CMD="runuser -u \"$AGENT_USER\" -- claude --allowedTools \"$ALLOWED_TOOLS\" $RESUME_OPTS -p \"$TASK_PROMPT\""
     else
-        CLAUDE_CMD="claude --allowedTools \"$ALLOWED_TOOLS\" $RESUME_OPTS -p \"$TASK_PROMPT\" >& agent-$SESSION_NAME.log"
+        CLAUDE_CMD="claude --allowedTools \"$ALLOWED_TOOLS\" $RESUME_OPTS -p \"$TASK_PROMPT\""
     fi
 fi
 
