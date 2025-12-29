@@ -3,23 +3,23 @@ allowed-tools: Bash(mkdir:*), Write, Read, Glob
 argument-hint: <goal-name> [--help]
 description: Define a new goal with constraints for Goal Driven Development
 ---
-Create a new goal directory structure for Goal Driven Development (GDD). Usage: `/define-goal <goal-name>`
+Create a new goal directory structure for Goal Driven Development (GDD). Usage: `/gdd-define-goal <goal-name>`
 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions below and stop:
 
 ```
-Usage: /define-goal <goal-name>
+Usage: /gdd-define-goal <goal-name>
 
 Creates a new goal directory at docs/goal/<goal-name>/ containing:
   - goal.md        Long-term, non-specific goal definition
   - constraints.md Hard boundaries and rules for achieving the goal
 
 Examples:
-  /define-goal reliable-payments
-  /define-goal improve-performance
-  /define-goal refactor-auth-system
+  /gdd-define-goal reliable-payments
+  /gdd-define-goal improve-performance
+  /gdd-define-goal refactor-auth-system
 
 The goal name should be lowercase with hyphens (kebab-case).
 ```
@@ -29,7 +29,7 @@ The goal name should be lowercase with hyphens (kebab-case).
 ### Phase 1: Validate Arguments
 
 1. Check if $ARGUMENTS is empty or only whitespace
-   - If empty, display error: "Error: Goal name is required. Usage: `/define-goal <goal-name>`"
+   - If empty, display error: "Error: Goal name is required. Usage: `/gdd-define-goal <goal-name>`"
    - Stop execution
 
 2. Extract the goal name from $ARGUMENTS (first word, ignore any extra arguments)
@@ -194,4 +194,4 @@ These constraints define the hard boundaries for achieving the goal "<Goal Name 
 
 - **Next Steps**: After goal definition, inform user they can:
   - Review the newly created goal and constrains
-  - Generate tasks for Claude using slash command: `/generate-tasks <goal-name>`
+  - Generate tasks for Claude using slash command: `/gdd-generate-tasks <goal-name>`

@@ -55,31 +55,92 @@ This plugin is part of the gosu-code plugin marketplace. To install:
 
 ## Commands
 
-### `/define-goal <goal-name>`
+### `/gdd-define-goal <goal-name>`
 
 Creates a new goal directory structure with templates for goal definition and constraints.
 
 **Usage:**
+
 ```bash
-/define-goal reliable-payments
-/define-goal improve-performance
-/define-goal refactor-auth-system
+/gdd-define-goal reliable-payments
+/gdd-define-goal improve-performance
+/gdd-define-goal refactor-auth-system
 ```
 
 **Creates:**
+
 ```
 docs/goal/<goal-name>/
   goal.md         # Long-term goal definition
   constraints.md  # Hard boundaries and rules
 ```
 
+### `/gdd-generate-tasks <goal-name>`
+
+Generates up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal.
+
+**Usage:**
+
+```bash
+/gdd-generate-tasks reliable-payments
+/gdd-generate-tasks improve-performance
+```
+
+**Features:**
+
+- Analyzes current codebase state using Explore subagent
+- Verifies existing completed tasks against actual implementation
+- Generates context-aware tasks based on goal and constraints
+- Prevents duplicate tasks
+- Maintains task capacity limit (max 5 pending tasks)
+
+**Creates:**
+
+```
+docs/goal/<goal-name>/
+  tasks.md        # Task list with acceptance criteria
+```
+
+### `/gdd-setup-hook <goal-name> [--remove]`
+
+Sets up or removes a Stop hook that automatically prompts for the next task from the goal's task list.
+
+**Usage:**
+
+```bash
+/gdd-setup-hook reliable-payments              # Add hook
+/gdd-setup-hook improve-performance            # Add hook
+/gdd-setup-hook reliable-payments --remove     # Remove hook
+```
+
+**Features:**
+
+- Configures `.claude/settings.local.json` with Stop hook
+- Automatically prompts for next task when you stop/pause conversation
+- Helps maintain focus on goal-driven development
+- Non-destructive (preserves other hooks and settings)
+
+### `/gdd-complete-goal <goal-name>`
+
+Completes work on a defined goal by removing the Stop hook and entering plan mode to systematically work through all tasks.
+
+**Usage:**
+
+```bash
+/gdd-complete-goal reliable-payments
+/gdd-complete-goal improve-performance
+```
+
+**Features:**
+
+- Removes Stop hook for uninterrupted work session
+- Enters plan mode with goal context (goal.md, constraints.md, tasks.md)
+- Enables comprehensive, focused completion of goal
+- Provides user approval workflow before implementation
+
 ### `/analyze-repo` (Coming Soon)
 
 Analyzes the current repository state to create a snapshot for task generation.
-
-### `/generate-tasks` (Coming Soon)
-
-Generates a task set based on the defined goal, constraints, and current repository state.
 
 ### `/list-goals` (Coming Soon)
 
@@ -123,30 +184,62 @@ The `constraints.md` file includes:
 
 ## Workflow Example
 
+### Workflow A: Incremental Task-by-Task Approach
+
 1. **Define your goal:**
+
    ```bash
-   /define-goal reliable-payments
+   /gdd-define-goal reliable-payments
    ```
 
-2. **Edit the goal and constraints:**
-   - Open `docs/goal/reliable-payments/goal.md`
+2. **Interactive goal definition:**
+   - Claude will guide you through filling in goal.md and constraints.md
    - Define your vision and success criteria
-   - Open `docs/goal/reliable-payments/constraints.md`
    - Set your tech stack, timeline, and rules
 
-3. **Analyze your repository:**
+3. **Generate tasks:**
+
    ```bash
-   /analyze-repo reliable-payments
+   /gdd-generate-tasks reliable-payments
    ```
 
-4. **Generate tasks:**
+4. **Set up task automation (optional):**
+
    ```bash
-   /generate-tasks reliable-payments
+   /gdd-setup-hook reliable-payments
    ```
 
-5. **Work on tasks, repeat:**
-   - Complete tasks from the generated set
-   - Re-run `/analyze-repo` and `/generate-tasks` for the next cycle
+   This configures a Stop hook that will automatically prompt you for the next task when you stop/pause.
+
+5. **Work on tasks, iterate:**
+   - Complete tasks from the generated set (one at a time if using the hook)
+   - Re-run `/gdd-generate-tasks reliable-payments` to generate more tasks
+   - The hook will prompt you for the next task automatically
+
+6. **When switching goals or finishing:**
+
+   ```bash
+   /gdd-setup-hook reliable-payments --remove
+   ```
+
+### Workflow B: Comprehensive Goal Completion Approach
+
+1. **Define your goal and generate tasks** (steps 1-3 from Workflow A)
+
+2. **Complete the goal in one focused session:**
+
+   ```bash
+   /gdd-complete-goal reliable-payments
+   ```
+
+   This will:
+   - Remove any Stop hook for uninterrupted work
+   - Enter plan mode with full goal context
+   - Allow you to work through all tasks systematically
+   - Provide plan review and approval workflow
+
+3. **Iterate if needed:**
+   - If goal not fully achieved, generate more tasks and repeat
 
 ## Best Practices
 
@@ -161,6 +254,7 @@ The `constraints.md` file includes:
 ### Goal directory already exists
 
 If you see "Goal already exists", you can:
+
 - View the existing goal files
 - Choose a different goal name
 - Delete the existing directory and recreate
@@ -168,6 +262,7 @@ If you see "Goal already exists", you can:
 ### Command not found
 
 Ensure the plugin is properly installed:
+
 ```bash
 /list-plugins
 ```

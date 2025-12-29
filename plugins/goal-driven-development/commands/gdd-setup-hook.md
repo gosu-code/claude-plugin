@@ -4,14 +4,14 @@ argument-hint: <goal-name> [--remove] [--help]
 description: Setup or remove Stop hook to automatically prompt for next task from goal tasks
 ---
 
-Setup or remove a Stop hook that prompts for the next task from a goal's task list. Usage: `/setup-hook <goal-name> [--remove]`
+Setup or remove a Stop hook that prompts for the next task from a goal's task list. Usage: `/gdd-setup-hook <goal-name> [--remove]`
 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions below and stop:
 
 ```
-Usage: /setup-hook <goal-name> [--remove]
+Usage: /gdd-setup-hook <goal-name> [--remove]
 
 Sets up or removes a Stop hook in .claude/settings.local.json that will
 automatically prompt for the next task from docs/goal/<goal-name>/tasks.md
@@ -26,12 +26,12 @@ The hook will:
   - Help you maintain focus on goal-driven development
 
 Examples:
-  /setup-hook reliable-payments              # Add hook
-  /setup-hook improve-performance            # Add hook
-  /setup-hook reliable-payments --remove     # Remove hook
+  /gdd-setup-hook reliable-payments              # Add hook
+  /gdd-setup-hook improve-performance            # Add hook
+  /gdd-setup-hook reliable-payments --remove     # Remove hook
 
-The goal name should match an existing goal directory created by /define-goal.
-For adding a hook, the tasks.md file should exist (created by /generate-tasks).
+The goal name should match an existing goal directory created by /gdd-define-goal.
+For adding a hook, the tasks.md file should exist (created by /gdd-generate-tasks).
 ```
 
 ## Command Execution Process
@@ -40,7 +40,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 
 1. **Parse command arguments**:
    - Check if $ARGUMENTS is empty or only whitespace
-     - If empty, display error: "Error: Goal name is required. Usage: `/setup-hook <goal-name> [--remove]`"
+     - If empty, display error: "Error: Goal name is required. Usage: `/gdd-setup-hook <goal-name> [--remove]`"
      - Stop execution
 
    - Check if `--remove` flag is present in $ARGUMENTS
@@ -67,11 +67,11 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 **For ADD mode only** (`REMOVE_MODE = false`):
 
 1. Check if directory `docs/goal/<goal-name>/` exists
-   - If not found, display error: "Error: Goal '\<goal-name\>' does not exist. Please create it first using `/define-goal <goal-name>`"
+   - If not found, display error: "Error: Goal '\<goal-name\>' does not exist. Please create it first using `/gdd-define-goal <goal-name>`"
    - Stop execution
 
 2. Check if `docs/goal/<goal-name>/tasks.md` exists
-   - If not found, display error: "Error: Tasks file not found for goal '\<goal-name\>'. Please generate tasks first using `/generate-tasks <goal-name>`"
+   - If not found, display error: "Error: Tasks file not found for goal '\<goal-name\>'. Please generate tasks first using `/gdd-generate-tasks <goal-name>`"
    - Stop execution
 
 3. Verify task_list_md.py script exists
@@ -188,7 +188,7 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
    The hook will no longer activate when you stop or pause conversations.
 
    To re-enable the hook, run:
-   /setup-hook <goal-name>
+   /gdd-setup-hook <goal-name>
    ```
 
    **If REMOVE_MODE = false**:
@@ -208,11 +208,11 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 
    Next steps:
    - Start working on tasks: Use the Stop hook to get prompted for next task
-   - Generate more tasks: /generate-tasks <goal-name>
+   - Generate more tasks: /gdd-generate-tasks <goal-name>
    - Review goal progress: Check completed vs pending tasks
 
    To remove the hook, run:
-   /setup-hook <goal-name> --remove
+   /gdd-setup-hook <goal-name> --remove
    ```
 
 3. **Warn about restart** (if applicable):
@@ -226,15 +226,15 @@ For adding a hook, the tasks.md file should exist (created by /generate-tasks).
 ## Interactions With Other Commands
 
 - **Prerequisites for ADD mode**:
-  - `/define-goal <goal-name>` must be run first to create the goal
-  - `/generate-tasks <goal-name>` must be run to create the tasks.md file
+  - `/gdd-define-goal <goal-name>` must be run first to create the goal
+  - `/gdd-generate-tasks <goal-name>` must be run to create the tasks.md file
 
 - **Prerequisites for REMOVE mode**:
   - No prerequisites (can remove hook even if goal or tasks don't exist)
 
 - **Related Commands**:
-  - Use `/generate-tasks <goal-name>` to add more tasks as you progress
-  - Use `/setup-hook <goal-name> --remove` to disable the hook when switching goals
+  - Use `/gdd-generate-tasks <goal-name>` to add more tasks as you progress
+  - Use `/gdd-setup-hook <goal-name> --remove` to disable the hook when switching goals
 
 ## Interactions With Claude Subagents
 
