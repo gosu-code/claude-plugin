@@ -1,5 +1,4 @@
 ---
-name: "generate-tasks"
 argument-hint: <goal-name> [--help]
 description: "Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal"
 arguments:

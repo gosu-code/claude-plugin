@@ -2,6 +2,7 @@
 allowed-tools: Bash(mkdir:*), Write, Read, Edit
 argument-hint: <goal-name> [--remove] [--help]
 description: Setup or remove Stop hook to automatically prompt for next task from goal tasks
+model: claude-haiku-4-5
 ---
 
 Setup or remove a Stop hook that prompts for the next task from a goal's task list. Usage: `/gdd-setup-hook <goal-name> [--remove]`

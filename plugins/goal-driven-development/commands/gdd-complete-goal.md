@@ -95,10 +95,10 @@ The tasks.md file should exist (created by /gdd-generate-tasks).
 
 2. **Handle hook removal result**:
    - If hook removal succeeds:
-     - Display "✓ Stop hook removed for goal '<goal-name>'"
+     - Inform "✓ Stop hook removed for goal '<goal-name>'" and continue
    - If hook removal fails or hook didn't exist:
-     - Display "ℹ No active hook found (or already removed)"
-   - Continue execution regardless of hook status
+     - Inform "ℹ No active hook found (or already removed)" and continue
+   - Continue execution to Phase 4 regardless of hook status
 
 ### Phase 4: Enter Plan Mode
 
