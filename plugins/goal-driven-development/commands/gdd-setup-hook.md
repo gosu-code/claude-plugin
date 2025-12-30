@@ -14,7 +14,7 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
 ```
 Usage: /gdd-setup-hook <goal-name> [--remove]
 
-Sets up or removes a Stop hook in .claude/settings.local.json that will
+Sets up or removes a Stop hook in ./.claude/settings.local.json that will
 automatically prompt for the next task from docs/goal/<goal-name>/tasks.md
 when you stop or pause your conversation with Claude.
 
@@ -85,7 +85,7 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
 ### Phase 3: Modify settings.local.json
 
 1. **Determine settings file path**:
-   - Target file: `.claude/settings.local.json`
+   - Target file: `./.claude/settings.local.json`
    - Expand tilde to user's home directory
 
 2. **Read or initialize settings**:
@@ -100,7 +100,7 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
 
 3. **Create backup** (before any modifications):
    - If file exists, create a backup
-   - Backup location: `.claude/settings.local.json.backup`
+   - Backup location: `./.claude/settings.local.json.backup`
    - Include timestamp in backup for safety
 
 4. **Check current hook status**:
@@ -157,7 +157,7 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
 
 6. **Write updated settings**:
    - Convert the JSON object back to formatted JSON string
-   - Write to `.claude/settings.local.json`
+   - Write to `./.claude/settings.local.json`
    - Ensure proper file permissions (readable/writable by user)
 
 ### Phase 4: Verify and Confirm
@@ -165,12 +165,12 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
 1. **Verify the operation succeeded**:
 
    **If REMOVE_MODE = true**:
-   - Re-read the `.claude/settings.local.json` file (if it exists)
+   - Re-read the `./.claude/settings.local.json` file (if it exists)
    - Confirm the Stop hook for this goal no longer exists
    - If verification fails, display error and stop
 
    **If REMOVE_MODE = false**:
-   - Re-read the `.claude/settings.local.json` file
+   - Re-read the `./.claude/settings.local.json` file
    - Confirm the Stop hook exists and contains the correct command
    - Confirm the goal name is correctly embedded in the command
    - If verification fails, display error and stop
@@ -183,8 +183,8 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
    ✓ Stop hook removed successfully for goal '<goal-name>'
 
    Details:
-   - Location: .claude/settings.local.json
-   - Backup saved: .claude/settings.local.json.backup
+   - Location: ./.claude/settings.local.json
+   - Backup saved: ./.claude/settings.local.json.backup
 
    The hook will no longer activate when you stop or pause conversations.
 
@@ -198,7 +198,7 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
    ✓ Stop hook configured successfully for goal '<goal-name>'
 
    Hook details:
-   - Location: .claude/settings.local.json
+   - Location: ./.claude/settings.local.json
    - Task file: docs/goal/<goal-name>/tasks.md
    - Wait timeout: 60 seconds
 
@@ -221,8 +221,8 @@ For adding a hook, the tasks.md file should exist (created by /gdd-generate-task
 
 ## Output Directory
 
-- Configuration file: `.claude/settings.local.json`
-- Backup file (if created): `.claude/settings.local.json.backup`
+- Configuration file: `./.claude/settings.local.json`
+- Backup file (if created): `./.claude/settings.local.json.backup`
 
 ## Interactions With Other Commands
 
