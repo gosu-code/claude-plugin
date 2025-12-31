@@ -406,7 +406,7 @@ The goal name should match an existing goal directory created by /gdd-define-goa
 - **Prerequisite**: `/gdd-define-goal <goal-name>` must be run first to create the goal definition
 - **Next Steps**: After task generation, inform user they can:
   - Review the newly created tasks against the target Goal definition
-  - Setup Stop hook using slash command: `/gdd-setup-hook <goal-name>` this hook will force Claude to work autonomously until the target Goal is achieved.
+  - Start working on the goal: `/gdd-start-working <goal-name> <session-id>` this command will also force Claude to work autonomously until the target Goal is achieved.
 
 ## Interactions With Claude Subagents
 

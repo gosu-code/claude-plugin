@@ -101,42 +101,24 @@ docs/goal/<goal-name>/
   tasks.md        # Task list with acceptance criteria
 ```
 
-### `/gdd-setup-hook <goal-name> [--remove]`
+### `/gdd-start-working <goal-name> <session-id>`
 
-Sets up or removes a Stop hook that automatically prompts for the next task from the goal's task list.
+Sets up session hooks and immediately starts working toward the goal.
 
 **Usage:**
 
 ```bash
-/gdd-setup-hook reliable-payments              # Add hook
-/gdd-setup-hook improve-performance            # Add hook
-/gdd-setup-hook reliable-payments --remove     # Remove hook
+/gdd-start-working reliable-payments abc12345-1234-5678-9abc-def012345678
+/gdd-start-working improve-performance 32502be3-59b3-4176-94c4-fd851d460417
 ```
 
 **Features:**
 
-- Configures `.claude/settings.local.json` with Stop hook
+- Creates session-scoped hooks (Stop and SessionStart) in `.claude/hooks.<session-id>.json`
+- Immediately starts working on the first pending task
 - Automatically prompts for next task when you stop/pause conversation
 - Helps maintain focus on goal-driven development
-- Non-destructive (preserves other hooks and settings)
-
-### `/gdd-complete-goal <goal-name>`
-
-Completes work on a defined goal by removing the Stop hook and entering plan mode to systematically work through all tasks.
-
-**Usage:**
-
-```bash
-/gdd-complete-goal reliable-payments
-/gdd-complete-goal improve-performance
-```
-
-**Features:**
-
-- Removes Stop hook for uninterrupted work session
-- Enters plan mode with goal context (goal.md, constraints.md, tasks.md)
-- Enables comprehensive, focused completion of goal
-- Provides user approval workflow before implementation
+- Session hooks auto-expire when session ends
 
 ### `/analyze-repo` (Coming Soon)
 
@@ -184,8 +166,6 @@ The `constraints.md` file includes:
 
 ## Workflow Example
 
-### Workflow A: Incremental Task-by-Task Approach
-
 1. **Define your goal:**
 
    ```bash
@@ -203,43 +183,26 @@ The `constraints.md` file includes:
    /gdd-generate-tasks reliable-payments
    ```
 
-4. **Set up task automation (optional):**
+4. **Start working toward the goal:**
 
    ```bash
-   /gdd-setup-hook reliable-payments
+   /gdd-start-working reliable-payments <session-id>
    ```
 
-   This configures a Stop hook that will automatically prompt you for the next task when you stop/pause.
+   This sets up session hooks and immediately starts working on the first task. Use `/id` to get your session ID.
 
 5. **Work on tasks, iterate:**
-   - Complete tasks from the generated set (one at a time if using the hook)
-   - Re-run `/gdd-generate-tasks reliable-payments` to generate more tasks
-   - The hook will prompt you for the next task automatically
+   - Complete tasks from the generated set (one at a time)
+   - The hook will prompt you for the next task automatically when you stop/pause
+   - Re-run `/gdd-generate-tasks reliable-payments` when more tasks are needed
 
 6. **When switching goals or finishing:**
 
    ```bash
-   /gdd-setup-hook reliable-payments --remove
+   rm .claude/hooks.<session-id>.json
    ```
 
-### Workflow B: Comprehensive Goal Completion Approach
-
-1. **Define your goal and generate tasks** (steps 1-3 from Workflow A)
-
-2. **Complete the goal in one focused session:**
-
-   ```bash
-   /gdd-complete-goal reliable-payments
-   ```
-
-   This will:
-   - Remove any Stop hook for uninterrupted work
-   - Enter plan mode with full goal context
-   - Allow you to work through all tasks systematically
-   - Provide plan review and approval workflow
-
-3. **Iterate if needed:**
-   - If goal not fully achieved, generate more tasks and repeat
+   Or simply end the session - hooks auto-expire.
 
 ## Best Practices
 
