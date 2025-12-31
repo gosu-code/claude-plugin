@@ -2,21 +2,20 @@
 allowed-tools: Bash(mkdir:*), Write, Read, Edit
 argument-hint: <goal-name> <session-id> [--help]
 description: Setup session hooks and start working toward the goal immediately
-model: claude-haiku-4-5
 ---
 
-Setup session hooks for goal-driven development and immediately start working on the first task. Usage: `/gdd-start-working <goal-name> <session-id>`
+Setup session hooks for goal-driven development and immediately start working on the first task. Usage: `/gdd:start-working <goal-name> <session-id>`
 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions below and stop:
 
 ```
-Usage: /gdd-start-working <goal-name> <session-id>
+Usage: /gdd:start-working <goal-name> <session-id>
 
 Sets up session-scoped hooks and immediately starts working toward the goal.
-Uses skill `session-hook` to configure Stop and SessionStart hooks, then
-begins working on tasks from docs/goal/<goal-name>/tasks.md.
+Creates a session hook file with Stop and SessionStart hooks, then
+begins working on tasks from docs/goal/<goal-name>/tasks.md using `task-list-md` skill
 
 Arguments:
   <goal-name>   Name of the goal (must match existing goal directory)
@@ -35,11 +34,11 @@ The hooks will:
   - Auto-expire when session ends or ID changes
 
 Examples:
-  /gdd-start-working reliable-payments abc12345-1234-5678-9abc-def012345678
-  /gdd-start-working improve-performance 32502be3-59b3-4176-94c4-fd851d460417
+  /gdd:start-working reliable-payments abc12345-1234-5678-9abc-def012345678
+  /gdd:start-working improve-performance 32502be3-59b3-4176-94c4-fd851d460417
 
-The goal name should match an existing goal directory created by /gdd-define-goal.
-The tasks.md file should exist (created by /gdd-generate-tasks).
+The goal name should match an existing goal directory created by /gdd:define-goal.
+The tasks.md file should exist (created by /gdd:generate-tasks).
 
 To remove the hooks, simply delete the session hook file:
   rm .claude/hooks.<session-id>.json
@@ -51,7 +50,7 @@ To remove the hooks, simply delete the session hook file:
 
 1. **Parse command arguments**:
    - Check if $ARGUMENTS has at least 2 arguments (goal-name and session-id)
-     - If missing arguments, display error: "Error: Both goal name and session ID are required. Usage: `/gdd-start-working <goal-name> <session-id>`"
+     - If missing arguments, display error: "Error: Both goal name and session ID are required. Usage: `/gdd:start-working <goal-name> <session-id>`"
      - Stop execution
 
    - Extract the `<goal-name>` from first argument: $1
@@ -77,12 +76,19 @@ To remove the hooks, simply delete the session hook file:
 ### Phase 2: Verify Prerequisites
 
 1. Check if directory `docs/goal/<goal-name>/` exists
-   - If not found, display error: "Error: Goal '\<goal-name\>' does not exist. Please create it first using `/gdd-define-goal <goal-name>`"
+   - If not found, display error: "Error: Goal '\<goal-name\>' does not exist. Please create it first using `/gdd:define-goal <goal-name>`"
    - Stop execution
 
 2. Check if `docs/goal/<goal-name>/tasks.md` exists
-   - If not found, display error: "Error: Tasks file not found for goal '\<goal-name\>'. Please generate tasks first using `/gdd-generate-tasks <goal-name>`"
+   - If not found, display error: "Error: Tasks file not found for goal '\<goal-name\>'. Please generate tasks first using `/gdd:generate-tasks <goal-name>`"
    - Stop execution
+
+3. Verify task_list_md.py script exists
+   - Check path: `~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py`
+   - Expand `~` to the user's home directory to get absolute path
+   - If not found, display error: "Error: task_list_md.py script not found. Please install gosu-code claude plugins: `/plugin marketplace add gosu-code/claude-plugin`"
+   - Stop execution
+   - Store the resolved absolute path as `<SCRIPT_PATH>` for use in Phase 3 (e.g., `/Users/username/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py`)
 
 ### Phase 3: Create Session Hook File
 
@@ -91,7 +97,7 @@ To remove the hooks, simply delete the session hook file:
    - Create `.claude` directory if it doesn't exist: `mkdir -p .claude`
 
 2. **Create session hook configuration**:
-Use skill `session-hook` to create a session hook configuration as follow:
+
    **Session hook structure to create**:
 
    ```json
@@ -104,34 +110,35 @@ Use skill `session-hook` to create a session hook configuration as follow:
                "type": "json",
                "json": {
                  "decision": "block",
-                 "reason": "Must use `task-list-md` skill to `get-next-task` (wait up to 1h if no task is available yet) from the task file `docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the `task_list_md.py get-next-task --wait 1h` command output."
+                 "reason": "Must run the following command: `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the command output."
+               }
+             }
+           ]
+         }
+       ],
+       "SessionStart": [
+         {
+           "matcher": "compact",
+           "hooks": [
+             {
+               "type": "json",
+               "json": {
+                 "hookSpecificOutput": {
+                   "hookEventName": "SessionStart",
+                   "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use script `<SCRIPT_PATH>` to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`</system-prompt>"
+                 }
                }
              }
            ]
          }
        ]
-     },
-     "SessionStart": [
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "json",
-            "json": {
-              "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use `task-list-md` skill to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd-generate-tasks <goal-name>`</system-prompt>"
-              }
-            }
-          }
-        ]
-      }
-    ]
+     }
    }
-
    ```
 
    - MUST replace `<goal-name>` with the actual goal name from arguments
+   - MUST replace `<SCRIPT_PATH>` with the resolved absolute path from Phase 2 step 3
+   - Refer to skill `session-hook` as needed to create a valid temporary session hook configuration
 
 ### Phase 4: Verify Hook Setup
 
@@ -146,15 +153,19 @@ Use skill `session-hook` to create a session hook configuration as follow:
 1. **Understand Goal & Constraints**
 
 - Read the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory
-- Use skill `task-list-md` to get-next-task from task file `docs/goal/<goal-name>/tasks.md` to pick up a first task to work on
-- Do not read/update the task file directly by yourself. Always use `task-list-md.py` script to do so
+- Run: `<SCRIPT_PATH> get-next-task docs/goal/<goal-name>/tasks.md` to pick up a first task to work on
+- Do not read/update the task file directly by yourself. Always use `task_list_md.py` script to do so
 
 2. **Start Working**
 
-- Use task-list-md skill to change task status as you progress. Start working: "pending" -> "in-progress", Completion: "in-progress" -> "review"
+- Use `<SCRIPT_PATH>` to change task status as you progress:
+  - Start working: `<SCRIPT_PATH> update-status docs/goal/<goal-name>/tasks.md <task-id> in-progress`
+  - Completion: `<SCRIPT_PATH> update-status docs/goal/<goal-name>/tasks.md <task-id> review`
 - After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
-- If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd-generate-tasks <goal-name>`
-- Else, must use task-list-md skill to run the following command `task_list_md.py get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the `task_list_md.py get-next-task` command output
+- If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`
+- Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output
+
+**Note**: `<SCRIPT_PATH>` is the resolved absolute path from Phase 2 step 3 (e.g., `/Users/username/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py`)
 
 ## Output Directory
 
@@ -163,11 +174,11 @@ Use skill `session-hook` to create a session hook configuration as follow:
 ## Interactions With Other Commands
 
 - **Prerequisites**:
-  - `/gdd-define-goal <goal-name>` must be run first to create the goal
-  - `/gdd-generate-tasks <goal-name>` must be run to create the tasks.md file
+  - `/gdd:define-goal <goal-name>` must be run first to create the goal
+  - `/gdd:generate-tasks <goal-name>` must be run to create the tasks.md file
 
 - **Related Commands**:
-  - Use `/gdd-generate-tasks <goal-name>` to add more tasks as you progress
+  - Use `/gdd:generate-tasks <goal-name>` to add more tasks as you progress
 
 ## Interactions With Claude Subagents
 

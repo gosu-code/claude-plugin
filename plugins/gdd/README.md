@@ -55,16 +55,16 @@ This plugin is part of the gosu-code plugin marketplace. To install:
 
 ## Commands
 
-### `/gdd-define-goal <goal-name>`
+### `/gdd:define-goal <goal-name>`
 
 Creates a new goal directory structure with templates for goal definition and constraints.
 
 **Usage:**
 
 ```bash
-/gdd-define-goal reliable-payments
-/gdd-define-goal improve-performance
-/gdd-define-goal refactor-auth-system
+/gdd:define-goal reliable-payments
+/gdd:define-goal improve-performance
+/gdd:define-goal refactor-auth-system
 ```
 
 **Creates:**
@@ -75,15 +75,15 @@ docs/goal/<goal-name>/
   constraints.md  # Hard boundaries and rules
 ```
 
-### `/gdd-generate-tasks <goal-name>`
+### `/gdd:generate-tasks <goal-name>`
 
 Generates up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal.
 
 **Usage:**
 
 ```bash
-/gdd-generate-tasks reliable-payments
-/gdd-generate-tasks improve-performance
+/gdd:generate-tasks reliable-payments
+/gdd:generate-tasks improve-performance
 ```
 
 **Features:**
@@ -101,15 +101,15 @@ docs/goal/<goal-name>/
   tasks.md        # Task list with acceptance criteria
 ```
 
-### `/gdd-start-working <goal-name> <session-id>`
+### `/gdd:start-working <goal-name> <session-id>`
 
 Sets up session hooks and immediately starts working toward the goal.
 
 **Usage:**
 
 ```bash
-/gdd-start-working reliable-payments abc12345-1234-5678-9abc-def012345678
-/gdd-start-working improve-performance 32502be3-59b3-4176-94c4-fd851d460417
+/gdd:start-working reliable-payments abc12345-1234-5678-9abc-def012345678
+/gdd:start-working improve-performance 32502be3-59b3-4176-94c4-fd851d460417
 ```
 
 **Features:**
@@ -169,7 +169,7 @@ The `constraints.md` file includes:
 1. **Define your goal:**
 
    ```bash
-   /gdd-define-goal reliable-payments
+   /gdd:define-goal reliable-payments
    ```
 
 2. **Interactive goal definition:**
@@ -180,13 +180,13 @@ The `constraints.md` file includes:
 3. **Generate tasks:**
 
    ```bash
-   /gdd-generate-tasks reliable-payments
+   /gdd:generate-tasks reliable-payments
    ```
 
 4. **Start working toward the goal:**
 
    ```bash
-   /gdd-start-working reliable-payments <session-id>
+   /gdd:start-working reliable-payments <session-id>
    ```
 
    This sets up session hooks and immediately starts working on the first task. Use `/id` to get your session ID.
@@ -194,7 +194,7 @@ The `constraints.md` file includes:
 5. **Work on tasks, iterate:**
    - Complete tasks from the generated set (one at a time)
    - The hook will prompt you for the next task automatically when you stop/pause
-   - Re-run `/gdd-generate-tasks reliable-payments` when more tasks are needed
+   - Re-run `/gdd:generate-tasks reliable-payments` when more tasks are needed
 
 6. **When switching goals or finishing:**
 

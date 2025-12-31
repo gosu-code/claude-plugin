@@ -14,14 +14,14 @@ category: "command"
 version: "1.0"
 ---
 
-Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal. Usage: `/gdd-generate-tasks <goal-name>`
+Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal. Usage: `/gdd:generate-tasks <goal-name>`
 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions and stop. Do not proceed further.
 
 ```
-Usage: /gdd-generate-tasks <goal-name>
+Usage: /gdd:generate-tasks <goal-name>
 
 Generates up to 5 small, specific, actionable tasks with clear expectations to progress
 toward the specified goal. Each task MUST be:
@@ -33,10 +33,10 @@ toward the specified goal. Each task MUST be:
 Reads from docs/goal/<goal-name>/goal.md and constraints.md to create focused tasks.
 
 Examples:
-  /gdd-generate-tasks reliable-payments
-  /gdd-generate-tasks improve-performance
+  /gdd:generate-tasks reliable-payments
+  /gdd:generate-tasks improve-performance
 
-The goal name should match an existing goal directory created by /gdd-define-goal.
+The goal name should match an existing goal directory created by /gdd:define-goal.
 ```
 
 ## Command Execution Process
@@ -45,7 +45,7 @@ The goal name should match an existing goal directory created by /gdd-define-goa
 
 1. **Validate Arguments**:
    - Check if $ARGUMENTS is empty or only whitespace
-     - If empty, display error: "Error: Goal name is required. Usage: `/gdd-generate-tasks <goal-name>`"
+     - If empty, display error: "Error: Goal name is required. Usage: `/gdd:generate-tasks <goal-name>`"
      - Stop execution
 
    - Extract the goal name from $ARGUMENTS (first word)
@@ -54,7 +54,7 @@ The goal name should match an existing goal directory created by /gdd-define-goa
 2. **Check Goal Existence**:
    - Verify that `docs/goal/<goal-name>/` directory exists
    - Check that both `goal.md` and `constraints.md` files exist
-   - If the goal doesn't exist, display error: "Error: Goal '<goal-name>' not found. Please create it first using `/gdd-define-goal <goal-name>`"
+   - If the goal doesn't exist, display error: "Error: Goal '<goal-name>' not found. Please create it first using `/gdd:define-goal <goal-name>`"
    - Stop execution if goal not found
 
    - **Check for Existing Tasks**:
@@ -403,10 +403,10 @@ The goal name should match an existing goal directory created by /gdd-define-goa
 
 ## Interactions With Other Commands
 
-- **Prerequisite**: `/gdd-define-goal <goal-name>` must be run first to create the goal definition
+- **Prerequisite**: `/gdd:define-goal <goal-name>` must be run first to create the goal definition
 - **Next Steps**: After task generation, inform user they can:
   - Review the newly created tasks against the target Goal definition
-  - Start working on the goal: `/gdd-start-working <goal-name> <session-id>` this command will also force Claude to work autonomously until the target Goal is achieved.
+  - Start working on the goal: `/gdd:start-working <goal-name> <session-id>` this command will also force Claude to work autonomously until the target Goal is achieved.
 
 ## Interactions With Claude Subagents
 
