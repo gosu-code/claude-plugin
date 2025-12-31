@@ -21,18 +21,19 @@
 # Helper script to run Claude Code CLI with all MCP & tools
 # Will support other AI coding agent CLI in the future
 # Usage:
-#   scripts/run_ai_coding_agent.sh [-u agent_user_name] [--yolo] [-r session_id] [task_prompt]
+#   scripts/run_ai_coding_agent.sh [-u agent_user_name] [--yolo] [-r session_id] [--run-every [seconds]] [task_prompt]
 
 set -e
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [-u agent_user_name] [--yolo] [-r session_id] [task_prompt]"
+    echo "Usage: $0 [-u agent_user_name] [--yolo] [-r session_id] [--run-every [seconds]] [task_prompt]"
     echo ""
     echo "Options:"
     echo "  -u agent_user_name  Run claude as specified user"
     echo "  --yolo              Enable dangerous permissions mode (skips tool restrictions)"
     echo "  -r session_id       Resume a conversation with session ID (use 'last' for most recent)"
+    echo "  --run-every [N]     Run the command every N seconds in a loop (default: 1800 if N not specified)"
     echo ""
     echo "Arguments:"
     echo "  task_prompt        (optional) Main task prompt for the claude agent (default: 'perform assigned tasks')"
@@ -45,6 +46,8 @@ show_usage() {
     echo "  $0 -u agent --yolo 'dangerous operations'"
     echo "  $0 -r last"
     echo "  $0 -r abc123 'continue with bug fixes'"
+    echo "  $0 --run-every 600 'perform assigned tasks'"
+    echo "  $0 --run-every 'perform assigned tasks'  # defaults to 1800 seconds"
     exit 1
 }
 
@@ -53,6 +56,7 @@ AGENT_USER=""
 TASK_PROMPT="perform assigned tasks"
 YOLO_MODE=false
 RESUME_SESSION=""
+RUN_INTERVAL=0
 
 # Parse options and arguments
 while [[ $# -gt 0 ]]; do
@@ -68,6 +72,17 @@ while [[ $# -gt 0 ]]; do
         -r)
             RESUME_SESSION="$2"
             shift 2
+            ;;
+        --run-every)
+            # Check if next argument is a number
+            if [[ $# -gt 1 ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
+                RUN_INTERVAL="$2"
+                shift 2
+            else
+                # Default to 1800 if no number provided
+                RUN_INTERVAL=1800
+                shift
+            fi
             ;;
         -h|--help)
             show_usage
@@ -166,9 +181,46 @@ else
     fi
 fi
 
-# Start new session in current directory
-echo "Starting a claude session with command:"
-echo "$CLAUDE_CMD"
-echo ""
-# Execute
-bash -c "$CLAUDE_CMD"
+# Function to run the claude command
+run_claude() {
+    echo "Starting a claude session with command:"
+    echo "$CLAUDE_CMD"
+    echo ""
+    # Execute
+    bash -c "$CLAUDE_CMD"
+}
+
+# Function to calculate and print next run time
+print_next_run_time() {
+    local interval=$1
+    if command -v gdate &> /dev/null; then
+        # macOS with GNU coreutils (brew install coreutils)
+        next_run=$(gdate -d "+${interval} seconds" "+%Y-%m-%d %H:%M:%S")
+    elif date -v +1d &> /dev/null 2>&1; then
+        # macOS BSD date
+        next_run=$(date -v+${interval}S "+%Y-%m-%d %H:%M:%S")
+    else
+        # Linux date
+        next_run=$(date -d "+${interval} seconds" "+%Y-%m-%d %H:%M:%S")
+    fi
+    echo ""
+    echo "================================================================"
+    echo "Next run scheduled at: $next_run"
+    echo "================================================================"
+    echo ""
+}
+
+# Execute with or without looping
+if [ "$RUN_INTERVAL" -gt 0 ]; then
+    echo "Loop mode enabled: running every $RUN_INTERVAL seconds"
+    echo ""
+
+    while true; do
+        run_claude
+        print_next_run_time "$RUN_INTERVAL"
+        sleep "$RUN_INTERVAL"
+    done
+else
+    # Single run
+    run_claude
+fi

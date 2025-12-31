@@ -1,6 +1,15 @@
 {
   "hooks": {
-    "PreToolUse":[
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      },
       {
         "matcher": "Read|Edit|Write|Bash",
         "hooks": [
@@ -12,7 +21,27 @@
         ]
       }
     ],
-    "PermissionRequest":[
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      },
       {
         "matcher": "Read|Edit|Write|Bash",
         "hooks": [
@@ -20,6 +49,28 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/block_dangerous_tool_usages.py",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
           }
         ]
       }
@@ -29,13 +80,53 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/task-list-md/scripts/task_list_md.py track-progress check --claude-hook",
             "timeout": 10
           }
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      }
+    ],
     "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
+          }
+        ]
+      },
       {
         "matcher": "compact",
         "hooks": [
@@ -43,6 +134,17 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/task-list-md/scripts/task_list_md.py track-progress check --claude-hook",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
+            "timeout": 65
           }
         ]
       }

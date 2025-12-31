@@ -1,0 +1,18 @@
+{
+  "description": "Block Claude from stopping until tests pass. Use for ensuring code quality before task completion.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "json",
+            "json": {
+              "decision": "block",
+              "reason": "Please run `make test` and ensure all tests pass before completing the task. If tests are not applicable, explain why."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

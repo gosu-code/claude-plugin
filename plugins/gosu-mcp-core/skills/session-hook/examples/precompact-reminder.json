@@ -1,0 +1,18 @@
+{
+  "description": "Add a reminder before automatic context compaction to preserve important information.",
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "json",
+            "json": {
+              "systemMessage": "Context is being compacted. Important reminders:\n- Current task: [describe task]\n- Key decisions made: [list decisions]\n- Pending items: [list pending]"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

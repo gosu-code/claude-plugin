@@ -1,0 +1,18 @@
+{
+  "description": "Inject project-specific context when a new session starts. Customize the systemMessage for your project.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "json",
+            "json": {
+              "systemMessage": "Project Guidelines:\n- Use TypeScript with strict mode\n- Follow the existing code patterns\n- Write tests for new functionality\n- Keep commits atomic and well-documented"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
