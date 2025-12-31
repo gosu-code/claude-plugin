@@ -159,8 +159,8 @@ To remove the hooks, simply delete the session hook file:
 2. **Start Working**
 
 - Use `<SCRIPT_PATH>` to change task status as you progress:
-  - Start working: `<SCRIPT_PATH> update-status docs/goal/<goal-name>/tasks.md <task-id> in-progress`
-  - Completion: `<SCRIPT_PATH> update-status docs/goal/<goal-name>/tasks.md <task-id> review`
+  - Start working: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> in-progress`
+  - Completion: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> review`
 - After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
 - If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`
 - Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output
