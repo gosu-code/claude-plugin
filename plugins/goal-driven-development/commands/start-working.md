@@ -125,7 +125,7 @@ To remove the hooks, simply delete the session hook file:
                "json": {
                  "hookSpecificOutput": {
                    "hookEventName": "SessionStart",
-                   "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use script `<SCRIPT_PATH>` to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`</system-prompt>"
+                   "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use script `<SCRIPT_PATH>` to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`</system-prompt>"
                  }
                }
              }
@@ -161,7 +161,7 @@ To remove the hooks, simply delete the session hook file:
 - Use `<SCRIPT_PATH>` to change task status as you progress:
   - Start working: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> in-progress`
   - Completion: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> review`
-- After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Then update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
+- After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
 - If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`
 - Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output
 
@@ -182,7 +182,7 @@ To remove the hooks, simply delete the session hook file:
 
 ## Interactions With Claude Subagents
 
-- Uses subagent `general-purpose` to verify and evaluate task completion status
+- Uses subagent `general-purpose` to verify and evaluate task completion status (run in background)
 
 ## Key Principles
 
