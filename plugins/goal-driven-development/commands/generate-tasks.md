@@ -1,10 +1,14 @@
 ---
-argument-hint: <goal-name> [--help]
+argument-hint: <goal-name> [<additional-prompt>] [--help]
 description: "Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal"
 arguments:
   - name: "goal-name"
     description: "Name of the goal (must match a directory in docs/goal/)"
     required: true
+    type: "string"
+  - name: "additional-prompt"
+    description: "Optional custom instructions to take into account during the entire command execution"
+    required: false
     type: "string"
 tools:
   - "Bash(python3 ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py:*)"
@@ -14,14 +18,14 @@ category: "command"
 version: "1.0"
 ---
 
-Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal. Usage: `/gdd:generate-tasks <goal-name>`
+Generate up to 5 small, specific, actionable tasks with clear expectations to work toward a defined goal. Usage: `/gdd:generate-tasks <goal-name> [<additional-prompt>]`
 
 User prompt: $ARGUMENTS
 
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions and stop. Do not proceed further.
 
 ```
-Usage: /gdd:generate-tasks <goal-name>
+Usage: /gdd:generate-tasks <goal-name> [<additional-prompt>]
 
 Generates up to 5 small, specific, actionable tasks with clear expectations to progress
 toward the specified goal. Each task MUST be:
@@ -32,9 +36,17 @@ toward the specified goal. Each task MUST be:
 
 Reads from docs/goal/<goal-name>/goal.md and constraints.md to create focused tasks.
 
+Arguments:
+  <goal-name>           Name of the goal (must match a directory in docs/goal/)
+  <additional-prompt>   Optional custom instructions to take into account during
+                        the entire command execution (e.g., focus areas, priorities,
+                        specific constraints)
+
 Examples:
   /gdd:generate-tasks reliable-payments
   /gdd:generate-tasks improve-performance
+  /gdd:generate-tasks reliable-payments "Focus on error handling and retry logic"
+  /gdd:generate-tasks improve-performance "Prioritize database query optimization"
 
 The goal name should match an existing goal directory created by /gdd:define-goal.
 ```
@@ -45,11 +57,19 @@ The goal name should match an existing goal directory created by /gdd:define-goa
 
 1. **Validate Arguments**:
    - Check if $ARGUMENTS is empty or only whitespace
-     - If empty, display error: "Error: Goal name is required. Usage: `/gdd:generate-tasks <goal-name>`"
+     - If empty, display error: "Error: Goal name is required. Usage: `/gdd:generate-tasks <goal-name> [<additional-prompt>]`"
      - Stop execution
 
-   - Extract the goal name from $ARGUMENTS (first word)
+   - Extract the goal name from $ARGUMENTS (first arg $1)
    - Normalize to lowercase and replace spaces with hyphens
+
+   - Extract the additional-prompt (second arg $2, if provided):
+     - If additional-prompt is provided, store it for use throughout command execution
+     - The additional-prompt should be treated as custom instructions that guide:
+       - Codebase exploration focus areas
+       - Task generation priorities
+       - Specific constraints or emphasis areas
+       - Any special considerations for this task generation run
 
 2. **Check Goal Existence**:
    - Verify that `docs/goal/<goal-name>/` directory exists
@@ -95,6 +115,10 @@ The goal name should match an existing goal directory created by /gdd:define-goa
      - Vision: [paste vision from goal.md]
      - Success Criteria: [paste success criteria from goal.md]
      - Scope: [paste scope from goal.md]
+
+     [If additional-prompt was provided, include this section:]
+     **Additional Instructions**: [paste the additional-prompt here]
+     Take these custom instructions into account when exploring the codebase and prioritizing findings.
 
      Please explore the codebase and provide:
      1. Current Implementation State:
@@ -146,6 +170,7 @@ The goal name should match an existing goal directory created by /gdd:define-goa
      - Constraints (tech stack, don't touch areas, safe change definition)
      - Explore subagent analysis (current state, gaps, opportunities)
      - **Existing tasks** (if tasks.md already exists - what's already planned/done)
+     - **Additional-prompt** (if provided - custom instructions and priorities)
 
    - Identify the most impactful, concrete next steps based on:
      - What the codebase exploration revealed as high-priority gaps
@@ -153,6 +178,7 @@ The goal name should match an existing goal directory created by /gdd:define-goa
      - Which changes would be "safe" per constraint definitions
      - What dependencies exist between potential tasks
      - **What's NOT already covered by existing tasks** (avoid duplication)
+     - **Custom priorities or focus areas from additional-prompt** (if provided)
 
 3. **Verify Completed Tasks** (if tasks.md exists):
 
@@ -269,12 +295,13 @@ The goal name should match an existing goal directory created by /gdd:define-goa
      - Definition of "complete" is obvious
      - Success is measurable/testable
 
-   **Task Generation Guidelines** (informed by Explore subagent findings):
+   **Task Generation Guidelines** (informed by Explore subagent findings and additional-prompt):
    - Create tasks based on ACTUAL codebase state revealed by exploration:
      - Reference specific files, functions, and components found by Explore subagent
      - Address specific gaps identified in the codebase analysis
      - Build on existing patterns and architecture discovered
      - Avoid duplicating functionality that already exists
+     - **If additional-prompt was provided**: Prioritize tasks that align with the custom instructions, focus areas, or specific constraints mentioned in the additional-prompt
 
    - **Duplicate Detection** (if tasks.md already exists):
      - Compare each new task against ALL existing tasks
@@ -298,6 +325,7 @@ The goal name should match an existing goal directory created by /gdd:define-goa
 
    - Prioritize tasks by:
      - **Which success criteria are not yet satisfied** (highest priority)
+     - **Custom priorities from additional-prompt** (if provided - may override default prioritization)
      - Impact on success criteria (even small tasks should move the needle)
      - Findings from Explore subagent (quick wins, high-impact areas)
      - Dependencies between tasks (discovered during exploration)
@@ -327,6 +355,7 @@ The goal name should match an existing goal directory created by /gdd:define-goa
      - Constraints reference: `Constraints: [constraints.md](../constraints.md)`
      - Success criteria being addressed by each task
      - Brief summary of Explore subagent findings that informed task creation
+     - **If additional-prompt was provided**: Include note about custom instructions used: `Custom Instructions: [paste additional-prompt]`
 
    - Ensure clear task structure with CONCRETE details:
      - Task ID and title
@@ -344,7 +373,8 @@ The goal name should match an existing goal directory created by /gdd:define-goa
    - **Append** the new tasks to the existing file using the Edit tool:
      - Maintain the same formatting and structure as existing tasks
      - Add a separator comment like: `<!-- New tasks added on YYYY-MM-DD -->`
-     - Add the 5 new tasks below the separator
+       - **If additional-prompt was provided**, include it in the separator: `<!-- New tasks added on YYYY-MM-DD - Custom instructions: [brief summary of additional-prompt] -->`
+     - Add the new tasks below the separator
      - Ensure new task IDs don't conflict with existing ones
      - Update any milestone summaries if they exist in the file
 
@@ -368,6 +398,9 @@ The goal name should match an existing goal directory created by /gdd:define-goa
 
 2. **Confirm Task Alignment**:
    - Display summary showing:
+     - **Custom Instructions** (if additional-prompt was provided):
+       - Display the additional-prompt used for this task generation
+       - Note how it influenced task priorities and focus areas
      - **Task Verification Results** (if tasks.md existed):
        - Number of tasks verified as truly complete
        - Number of tasks marked incomplete (with brief reasons)
