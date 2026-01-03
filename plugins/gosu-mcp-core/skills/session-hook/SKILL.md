@@ -12,14 +12,14 @@ Create temporary, session-scoped hooks that activate immediately without restart
 - **Immediate Activation**: Hooks take effect instantly, no Claude Code restart required
 - **Session-Scoped**: Automatically inactive when session ends or ID changes
 - **Safe Experimentation**: Test hook logic without modifying permanent configuration
-- **Per-Project or Global**: Store in `./.claude/` (project) or `~/.claude/` (global)
+- **Per-Project or Global**: Store in `./.claude/hooks/` (project) or `~/.claude/hooks/` (global)
 
 ## How Session Hooks Work
 
 Session hooks are JSON configuration files named `hooks.{session_id}.json` stored in:
 
-1. `./.claude/hooks.{session_id}.json` (local project, checked first)
-2. `~/.claude/hooks.{session_id}.json` (user home, fallback)
+1. `./.claude/hooks/hooks.{session_id}.json` (local project, checked first)
+2. `~/.claude/hooks/hooks.{session_id}.json` (user home, fallback)
 
 The `session_hook.py` hook script (already registered in gosu-mcp-core) reads these files and executes the configured hooks for each event.
 
@@ -31,7 +31,7 @@ The session ID may be available in the Claude Code environment or current contex
 
 ### Step 2: Create Session Hook File
 
-Create `.claude/hooks.{session_id}.json` with hook configuration:
+Create `.claude/hooks/hooks.{session_id}.json` with hook configuration:
 
 ```json
 {
@@ -278,11 +278,11 @@ To create a session hook file for the current session:
 # Get session ID (replace with actual session ID)
 SESSION_ID="32502be3-59b3-4176-94c4-fd851d460417"
 
-# Create .claude directory if needed
-mkdir -p .claude
+# Create .claude/hooks directory if needed
+mkdir -p .claude/hooks
 
 # Create session hook file
-cat > ".claude/hooks.${SESSION_ID}.json" << 'EOF'
+cat > ".claude/hooks/hooks.${SESSION_ID}.json" << 'EOF'
 {
   "hooks": {
     "Stop": [
@@ -345,13 +345,13 @@ Session hook files remain until manually deleted. To clean up:
 
 ```bash
 # Remove specific session hook
-rm .claude/hooks.{session_id}.json
+rm .claude/hooks/hooks.{session_id}.json
 
 # Remove all session hooks in project
-rm .claude/hooks.*.json
+rm .claude/hooks/hooks.*.json
 
 # Remove all session hooks in home directory
-rm ~/.claude/hooks.*.json
+rm ~/.claude/hooks/hooks.*.json
 ```
 
 ## Security Considerations
@@ -366,8 +366,8 @@ rm ~/.claude/hooks.*.json
 ### Hook Not Activating
 
 1. Verify session ID matches current session (use `/id` command)
-2. Check file path: `.claude/hooks.{session_id}.json`
-3. Validate JSON syntax: `jq . .claude/hooks.*.json`
+2. Check file path: `.claude/hooks/hooks.{session_id}.json`
+3. Validate JSON syntax: `jq . .claude/hooks/hooks.*.json`
 4. Ensure hook event name is correct (case-sensitive)
 
 ### Command Hook Failing
@@ -381,7 +381,7 @@ rm ~/.claude/hooks.*.json
 
 ```bash
 # Validate session hook file
-cat .claude/hooks.{session_id}.json | jq .
+cat .claude/hooks/hooks.{session_id}.json | jq .
 ```
 
 ## Additional Resources

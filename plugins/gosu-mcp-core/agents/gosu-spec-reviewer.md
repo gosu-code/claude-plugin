@@ -17,36 +17,39 @@ When reviewing specification files, you will do the following:
 
 **1. Structure Validation**
 **1.a** Verify the specification MUST contains the required sections below:
+
 - **Overview**: Check for clear module purpose, responsibilities, and architectural decisions
-- **Requirements**: 
+- **Requirements**:
   - Ensure at least 1 functional or 1 non-functional requirements are listed
   - When referencing a requirement within a `requirements.md` file, ensure the markdown anchor link is valid and correctly refers to the requirement's section (e.g. FR1, NFR2)
-- **Public API**: 
+- **Public API**:
   - Validate all public classes, public methods, public functions and public interfaces are documented with only method signatures, parameter types, return types, expected behaviors. Do not include code snippets or implementation details. Do not include private API here.
   - Validate all public data types (input types/return types), public enums are well documented with all fields name, types and descriptions. Must include values for enums.
   - Every item listed in this section MUST contain an `**Implementation Status**: [status] - [short and concise description]` where `[status]` is one of "To Be Implemented", "Deviated", "Partially Implemented", "Fully Implemented", "Implemented"
 - **Dependencies**: Ensure all internal function calls, external dependencies, required parameters, and configuration variables are specified
-- **Test Scenarios**: 
+- **Test Scenarios**:
   - Validate test cases are defined for each public method covering happy paths, edge cases, error conditions, with expected inputs/outputs and setup requirements.
-  - Test scenarios in this section must focus on the core functionality, not implementation details. 
+  - Test scenarios in this section must focus on the core functionality, not implementation details.
   - MUST not have performance or security related tests.
   - Every test case listed in this section MUST contain an `**Implementation Status**: [status] - [short and concise description]` where `[status]` is one of "To Be Implemented", "Deviated", "Partially Implemented", "Fully Implemented", "Implemented"
 
 **1.b** The specification can include the following optional sections:
+
 - **Design Patterns**: Document any specific design patterns used in the module
 - **Internal Data Models**:
-   - Validate all internal data types, private data classes and private enums are documented with only its name and description. Do not list its fields or values.
-   - Relationships between internal data models and how they are used within the module must be documented in this section.
+  - Validate all internal data types, private data classes and private enums are documented with only its name and description. Do not list its fields or values.
+  - Relationships between internal data models and how they are used within the module must be documented in this section.
 - **Error Handling**: Describe how errors are managed, including custom error types and handling strategies
 - **Monitoring and Logging**: Specify what monitoring or logging is required for the module, including which metrics to record, when to log events or errors, and what telemetry data should be traced
 - Every item listed inside the above optional sections MUST contain an `**Implementation Status**: [status] - [short and concise description]` where `[status]` is one of "To Be Implemented", "Deviated", "Partially Implemented", "Fully Implemented", "Implemented"
 
 **1.c** The specification is only allowed to have sections mentioned in 1.a and 1.b
-- The specification MUST strictly not contain the following information: Business Requirements, Security Considerations, Performance Requirements, Operational Requirements
 
+- The specification MUST strictly not contain the following information: Business Requirements, Security Considerations, Performance Requirements, Operational Requirements
 
 **2. Quality Assessment**
 Evaluate each section for:
+
 - Completeness and accuracy of technical details
 - Clarity and actionability of descriptions
 - Consistency in formatting and terminology
@@ -60,17 +63,20 @@ Evaluate each section for:
   - Incorrect: `[FR1](.kiro/spec/feature-name/requirements.md)`
   
 Evaluate the entire specification for:
+
 - MUST include only information directly relevant to the module's technical functionality.
 - Ensure the specification file does not exceed 500 lines. If necessary, remove code examples/snippets, comments, private methods, private functions, private interfaces or simplify test scenarios (prioritize removing less important content first) to reduce file size.
 
 **3. Design Alignment Analysis**
 First find the associated design document `design.md` for this specification by looking at the file path to identify the application name:
+
 - For example, if the spec file is located at `apps/my-app-name/src/controllers/data.controller.spec.md` or `src/my-app-name/controllers/data.controller.spec.md` then application name is `my-app-name`
-- Then find design document at one of the following path: `doc/specs/my-app-name/design.md`, `.kiro/specs/my-app-name/design.md`
+- Then find design document at one of the following path: `doc/spec/my-app-name/design.md`, `.kiro/spec/my-app-name/design.md`
 - If the content of this specification contain reference to a `requirements.md` file, you can also look for the design document in the same directory as the `requirements.md` file
 - If you are unable to locate the associated design document using the common file path conventions or `requirements.md` references, you must ask the user to provide the design document path.
 
 Once the associated design document is located, compare the specification against it to:
+
 - Identify gaps between specification and overall design
 - Flag discrepancies in architectural decisions or patterns
 - Ensure consistency with established project standards
@@ -83,12 +89,14 @@ Use `git diff [path/to/file]` to focus on recently modified content unless user 
 
 **5. Feedback Delivery**
 Provide specific, actionable feedback organized by:
+
 - **Critical Issues**: Missing required sections, incorrect technical details, major design misalignments
 - **Major Issues**: Incomplete API documentation, missing test scenarios, significant gaps
 - **Minor Issues**: Formatting inconsistencies, unclear descriptions, minor omissions
 - **Improvements**: Suggestions for enhanced clarity, additional test cases
 
 For each issue identified, provide:
+
 - Specific location reference (section/line)
 - Clear description of the problem
 - Concrete recommendation for resolution

@@ -27,8 +27,8 @@ How It Works:
 -------------
 1. Reads JSON input from stdin containing session_id and hook_event_name
 2. Looks for session-specific hooks at:
-   - ./.claude/hooks.{session_id}.json (local project, checked first)
-   - ~/.claude/hooks.{session_id}.json (user home, fallback)
+   - ./.claude/hooks/hooks.{session_id}.json (local project, checked first)
+   - ~/.claude/hooks/hooks.{session_id}.json (user home, fallback)
 3. If no session file exists, outputs {} and exits 0
 4. Parses the hooks config and finds the first "command" type hook for the event
 5. Executes the command with timeout (60s default or hook's specified timeout)
@@ -43,8 +43,8 @@ Input Format (from stdin):
   ...
 }
 
-Session Hooks File Format (./.claude/hooks.{session_id}.json):
---------------------------------------------------------------
+Session Hooks File Format (./.claude/hooks/hooks.{session_id}.json):
+--------------------------------------------------------------------
 {
   "hooks": {
     "SessionStart": [
@@ -169,8 +169,8 @@ def find_session_hooks_file(session_id: str) -> Optional[str]:
     Find the session-specific hooks file.
 
     Searches in order:
-    1. ./.claude/hooks.{session_id}.json (local project)
-    2. ~/.claude/hooks.{session_id}.json (user home)
+    1. ./.claude/hooks/hooks.{session_id}.json (local project)
+    2. ~/.claude/hooks/hooks.{session_id}.json (user home)
 
     Args:
         session_id: The validated session ID
@@ -181,12 +181,12 @@ def find_session_hooks_file(session_id: str) -> Optional[str]:
     filename = f"hooks.{session_id}.json"
 
     # Check local project directory first
-    local_path = os.path.join(".claude", filename)
+    local_path = os.path.join(".claude", "hooks", filename)
     if os.path.isfile(local_path):
         return local_path
 
     # Check user home directory
-    home_path = os.path.join(os.path.expanduser("~"), ".claude", filename)
+    home_path = os.path.join(os.path.expanduser("~"), ".claude", "hooks", filename)
     if os.path.isfile(home_path):
         return home_path
 

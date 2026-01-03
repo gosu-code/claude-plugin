@@ -83,9 +83,9 @@ def get_hooks_file_path(session_id: str, global_scope: bool = False) -> Path:
     filename = f"hooks.{session_id}.json"
 
     if global_scope:
-        return Path.home() / ".claude" / filename
+        return Path.home() / ".claude" / "hooks" / filename
     else:
-        return Path(".claude") / filename
+        return Path(".claude") / "hooks" / filename
 
 
 def load_existing_hooks(file_path: Path) -> Dict:
@@ -206,7 +206,7 @@ Examples:
         "--global",
         dest="global_scope",
         action="store_true",
-        help="Create hook in ~/.claude/ instead of ./.claude/",
+        help="Create hook in ~/.claude/hooks/ instead of ./.claude/hooks/",
     )
 
     # JSON hook options
