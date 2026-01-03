@@ -41,7 +41,7 @@ The goal name should match an existing goal directory created by /gdd:define-goa
 The tasks.md file should exist (created by /gdd:generate-tasks).
 
 To remove the hooks, simply delete the session hook file:
-  rm .claude/hooks.<session-id>.json
+  rm .claude/hooks/hooks.<session-id>.json
 ```
 
 ## Command Execution Process
@@ -93,8 +93,8 @@ To remove the hooks, simply delete the session hook file:
 ### Phase 3: Create Session Hook File
 
 1. **Determine session hook file path**:
-   - Target file: `./.claude/hooks.<session-id>.json`
-   - Create `.claude` directory if it doesn't exist: `mkdir -p .claude`
+   - Target file: `./.claude/hooks/hooks.<session-id>.json`
+   - Create `.claude/hooks` directory if it doesn't exist: `mkdir -p .claude/hooks`
 
 2. **Create session hook configuration**:
 
@@ -110,7 +110,7 @@ To remove the hooks, simply delete the session hook file:
                "type": "json",
                "json": {
                  "decision": "block",
-                 "reason": "Must run the following command: `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the command output."
+                 "reason": "Must run the following command: `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work."
                }
              }
            ]
@@ -143,7 +143,7 @@ To remove the hooks, simply delete the session hook file:
 ### Phase 4: Verify Hook Setup
 
 1. **Verify the operation succeeded**:
-   - Re-read the `./.claude/hooks.<session-id>.json` file
+   - Re-read the `./.claude/hooks/hooks.<session-id>.json` file
    - Confirm the Stop hook exists and contains the correct details
    - Confirm the SessionStart hook exists and contains the correct details
    - If verification fails, display error and stop execution
@@ -154,6 +154,7 @@ To remove the hooks, simply delete the session hook file:
 
 - Read the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory
 - Run: `<SCRIPT_PATH> get-next-task docs/goal/<goal-name>/tasks.md` to pick up a first task to work on
+- After receiving the task ID from `get-next-task`, always run: `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details
 - Do not read/update the task file directly by yourself. Always use `task_list_md.py` script to do so
 
 2. **Start Working**
@@ -163,13 +164,13 @@ To remove the hooks, simply delete the session hook file:
   - Completion: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> review`
 - After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
 - If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`
-- Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output
+- Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work
 
 **Note**: `<SCRIPT_PATH>` is the resolved absolute path from Phase 2 step 3 (e.g., `/Users/username/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py`)
 
 ## Output Directory
 
-- Session hook file: `./.claude/hooks.<session-id>.json`
+- Session hook file: `./.claude/hooks/hooks.<session-id>.json`
 
 ## Interactions With Other Commands
 

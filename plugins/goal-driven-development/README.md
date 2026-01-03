@@ -114,7 +114,7 @@ Sets up session hooks and immediately starts working toward the goal.
 
 **Features:**
 
-- Creates session-scoped hooks (Stop and SessionStart) in `.claude/hooks.<session-id>.json`
+- Creates session-scoped hooks (Stop and SessionStart) in `.claude/hooks/hooks.<session-id>.json`
 - Immediately starts working on the first pending task
 - Automatically prompts for next task when you stop/pause conversation
 - Helps maintain focus on goal-driven development
@@ -199,7 +199,7 @@ The `constraints.md` file includes:
 6. **When switching goals or finishing:**
 
    ```bash
-   rm .claude/hooks.<session-id>.json
+   rm .claude/hooks/hooks.<session-id>.json
    ```
 
    Or simply end the session - hooks auto-expire.
