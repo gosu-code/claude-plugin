@@ -13,21 +13,24 @@ These scripts can be executed in two ways depending on your environment:
 ### Option 1: Direct Execution (Traditional)
 
 **Requirements:**
-- `gh` CLI version 2.60+
-- `jq` CLI version 1.6+
+
+- `gh` CLI version 2.4+
+- `jq` CLI version 1.5+
 
 **When to use:**
-- You have `gh` and `jq` installed on your host system
-- You've permisson to run scripts directly
-- You prefer traditional shell command execution
+
+- You have `gh` and `jq` installed on your host system with correct version
+- `gh` CLI is authenticated (check with `gh auth status`)
 
 ### Option 2: Via Gosu MCP Server (run_cli)
 
 **Requirements:**
+
 - Gosu MCP server running and connected
 - Tool `mcp__gosu__run_cli` is available on the Gosu MCP server
 
 **When to use:**
+
 - `gh` or `jq` are not installed on your host system
 - `gh` CLI is not authenticated on your host system
 - You prefer a sandbox environment for command execution
@@ -61,6 +64,7 @@ scripts/get_pr_bot_review_comments.sh [OPTIONS] <owner> <repo> <pr_number>
 #### Output
 
 Returns a JSON array of review comments with the following structure:
+
 ```json
 [
   {
@@ -101,11 +105,13 @@ Returns a JSON array of review comments with the following structure:
 #### Examples
 
 **Fetch all bot comments for a PR:**
+
 ```bash
 scripts/get_pr_bot_review_comments.sh gosu-code gosu-mcp-server 123
 ```
 
 **Fetch unresolved bot comments:**
+
 ```bash
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
@@ -113,6 +119,7 @@ scripts/get_pr_bot_review_comments.sh \
 ```
 
 **Fetch unresolved & not outdated bot comments:**
+
 ```bash
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
@@ -121,6 +128,7 @@ scripts/get_pr_bot_review_comments.sh \
 ```
 
 **Fetch comments from bot and also non bot users:**
+
 ```bash
 scripts/get_pr_bot_review_comments.sh \
   --exclude-resolved \
@@ -129,6 +137,7 @@ scripts/get_pr_bot_review_comments.sh \
 ```
 
 **Process comments with jq:**
+
 ```bash
 # Count total bot comments
 scripts/get_pr_bot_review_comments.sh gosu-code gosu-mcp-server 123 | jq 'length'
@@ -164,11 +173,13 @@ scripts/reply_pr_review_comments_thread.sh [OPTIONS] <owner> <repo> <comment_id>
 #### Options
 
 **Body Input (choose one):**
+
 - `--body "text"` - Inline Markdown body for the reply (prefer to use this unless the text is long or contain special character)
 - `--body-file path` - Read reply body from a file
 - `--stdin` - Read reply body from STDIN (not recommended to use)
 
 **Additional Options:**
+
 - `--thread-id id` - GraphQL thread node ID (required with `--resolve-thread`)
 - `--resolve-thread` - Resolve the review thread after posting (requires `--thread-id`)
 - `-h, --help` - Display help message
@@ -182,6 +193,7 @@ scripts/reply_pr_review_comments_thread.sh [OPTIONS] <owner> <repo> <comment_id>
 #### Examples
 
 **Reply with inline text:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   --body "Thanks for catching that! Fixed in the latest commit." \
@@ -189,6 +201,7 @@ scripts/reply_pr_review_comments_thread.sh \
 ```
 
 **Reply from a file:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   --body-file reply.md \
@@ -196,12 +209,14 @@ scripts/reply_pr_review_comments_thread.sh \
 ```
 
 **Compose reply in editor:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   gosu-code gosu-mcp-server 2451122234
 ```
 
 **Reply with confirmation prompt:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   --body "Updated the implementation." \
@@ -209,6 +224,7 @@ scripts/reply_pr_review_comments_thread.sh \
 ```
 
 **Reply and resolve the thread:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   --body "Done! Resolving this thread." \
@@ -218,6 +234,7 @@ scripts/reply_pr_review_comments_thread.sh \
 ```
 
 **Dry run to preview:**
+
 ```bash
 scripts/reply_pr_review_comments_thread.sh \
   --body "Test reply" \
@@ -246,6 +263,7 @@ scripts/list_merged_pr.sh [OPTIONS]
 #### Options
 
 **Filtering Options:**
+
 - `-a, --authors USERS` - Comma-separated list of GitHub usernames to filter by
 - `-f, --from DATE` - Start date for PR merge filter (YYYY-MM-DD format)
 - `-t, --to DATE` - End date for PR merge filter (YYYY-MM-DD format)
@@ -253,6 +271,7 @@ scripts/list_merged_pr.sh [OPTIONS]
 - `-r, --repo REPO` - GitHub repository in format "owner/repo", default: current repository
 
 **Output Options:**
+
 - `-s, --save [DIR]` - Save PR details to files (one file per PR), optional directory path, default: ./out
 - `-h, --help` - Display help message
 
@@ -263,6 +282,7 @@ Displays a tab-separated list of PRs with: PR number, title (truncated to 120 ch
 
 **File Output (with `--save`):**
 Creates one markdown file per PR with the format `PR-{number}-{title}.md` containing:
+
 - PR metadata (author, merge date, URL)
 - Full PR description
 - List of commits with authors and messages
@@ -271,46 +291,55 @@ Creates one markdown file per PR with the format `PR-{number}-{title}.md` contai
 #### Examples
 
 **List all merged PRs from last 7 days (default):**
+
 ```bash
 scripts/list_merged_pr.sh
 ```
 
 **List merged PRs from specific authors:**
+
 ```bash
 scripts/list_merged_pr.sh --authors "john,jane,bob"
 ```
 
 **List merged PRs from last 30 days:**
+
 ```bash
 scripts/list_merged_pr.sh --days 30
 ```
 
 **List merged PRs within a specific date range:**
+
 ```bash
 scripts/list_merged_pr.sh --from "2025-10-01" --to "2025-10-31"
 ```
 
 **Combine filters: specific authors and date range:**
+
 ```bash
 scripts/list_merged_pr.sh --authors "john,jane" --from "2025-10-01" --to "2025-10-31"
 ```
 
 **Query a specific repository:**
+
 ```bash
 scripts/list_merged_pr.sh --repo "owner/repo" --days 30
 ```
 
 **Save PR details to files in ./out directory:**
+
 ```bash
 scripts/list_merged_pr.sh --save
 ```
 
 **Save PR details to custom directory:**
+
 ```bash
 scripts/list_merged_pr.sh --save /path/to/output --days 30
 ```
 
 **Process with jq:**
+
 ```bash
 # Count merged PRs
 scripts/list_merged_pr.sh --days 30 | wc -l
@@ -400,11 +429,13 @@ jq -r '.[] | "\n=== \(.threadPath):\(.threadLine) ===\n\(.comment.body)\n\nComme
 
 **Authentication errors:**
 Confirm if user is authenticated in the GitHub CLI, if not inform user to login with a credential that have the right access
+
 ```bash
 gh auth status
 ```
 
 **Permission errors:**
+
 - Ensure you have write access to the repository
 - Check that your GitHub token has the required scopes
 
@@ -417,6 +448,7 @@ When `gh` or `jq` are not available on your host system, you can use the Gosu MC
 ### How It Works
 
 The MCP `run_cli` tool:
+
 - Executes scripts in the MCP server's sandbox environment which have access to your current working directory
 - Automatically injects `GH_TOKEN` from server configuration for authentication
 - Supports all whitelisted programs: `bash`, `gh`, `jq`, `git`, `python3`, and others
@@ -425,6 +457,7 @@ The MCP `run_cli` tool:
 ### Quick Start
 
 **Step 1: Copy Scripts to Workspace**
+
 ```bash
 cp -rf ${CLAUDE_PLUGIN_ROOT}/skills/github-pr-utils/scripts ./scripts/
 ```
@@ -432,6 +465,7 @@ cp -rf ${CLAUDE_PLUGIN_ROOT}/skills/github-pr-utils/scripts ./scripts/
 **Step 2: Use MCP run_cli Tool**
 
 Basic structure of an MCP `run_cli` call:
+
 ```json
 {
   "program": "bash",
@@ -443,6 +477,7 @@ Basic structure of an MCP `run_cli` call:
 **Step 3: Process Results**
 
 The tool returns:
+
 ```json
 {
   "exit_code": 0,
@@ -468,6 +503,7 @@ The tool returns:
 | `error_file` | string | No | Redirect stderr to file |
 
 **Important Notes:**
+
 - Use `"program": "bash"` only for running `.sh` scripts, not inline bash commands
 - Use `"program": "jq"` for JSON processing instead of `bash -c "jq ..."`
 - Output is truncated at 100KB unless redirected to file
@@ -478,6 +514,7 @@ The tool returns:
 ### MCP Tool Specific Notes
 
 When using these scripts via MCP `run_cli`:
+
 - **Automatic Authentication**: GH_TOKEN is automatically injected for `bash` and `gh` programs - no manual `gh auth login` required
 - **Sandbox Environment**: Scripts execute in MCP sandbox environment with all file paths relative to workspace root
 - **Output Limits**: Stdout and stderr are truncated at 100KB unless redirected to file using `output_file` or `error_file` parameters
@@ -491,6 +528,7 @@ When using these scripts via MCP `run_cli`:
 #### 1. get_pr_bot_review_comments.sh
 
 **Fetch all bot comments:**
+
 ```json
 {
   "program": "bash",
@@ -505,6 +543,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Fetch unresolved bot comments:**
+
 ```json
 {
   "program": "bash",
@@ -520,6 +559,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Fetch unresolved & not outdated comments:**
+
 ```json
 {
   "program": "bash",
@@ -536,6 +576,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Include specific GitHub users:**
+
 ```json
 {
   "program": "bash",
@@ -553,6 +594,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Process JSON with jq:**
+
 ```json
 {
   "program": "jq",
@@ -561,6 +603,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Extract comment bodies:**
+
 ```json
 {
   "program": "jq",
@@ -569,6 +612,7 @@ When using these scripts via MCP `run_cli`:
 ```
 
 **Group comments by file:**
+
 ```json
 {
   "program": "jq",
@@ -582,6 +626,7 @@ When using these scripts via MCP `run_cli`:
 #### 2. reply_pr_review_comments_thread.sh
 
 **Reply with inline text:**
+
 ```json
 {
   "program": "bash",
@@ -599,6 +644,7 @@ When using these scripts via MCP `run_cli`:
 **Reply from file content:**
 
 First, create the reply file:
+
 ```json
 {
   "program": "bash",
@@ -610,6 +656,7 @@ First, create the reply file:
 ```
 
 Then reply using the file:
+
 ```json
 {
   "program": "bash",
@@ -625,6 +672,7 @@ Then reply using the file:
 ```
 
 **Reply and resolve thread:**
+
 ```json
 {
   "program": "bash",
@@ -645,6 +693,7 @@ Then reply using the file:
 **Multiple sequential replies:**
 
 Loop through comment IDs and reply to each:
+
 ```json
 {
   "program": "bash",
@@ -659,6 +708,7 @@ Loop through comment IDs and reply to each:
 #### 3. list_merged_pr.sh
 
 **List all merged PRs from last 7 days:**
+
 ```json
 {
   "program": "bash",
@@ -668,6 +718,7 @@ Loop through comment IDs and reply to each:
 ```
 
 **Filter by specific authors:**
+
 ```json
 {
   "program": "bash",
@@ -681,6 +732,7 @@ Loop through comment IDs and reply to each:
 ```
 
 **List PRs from last 30 days:**
+
 ```json
 {
   "program": "bash",
@@ -694,6 +746,7 @@ Loop through comment IDs and reply to each:
 ```
 
 **Specific date range:**
+
 ```json
 {
   "program": "bash",
@@ -709,6 +762,7 @@ Loop through comment IDs and reply to each:
 ```
 
 **Save PR details to files:**
+
 ```json
 {
   "program": "bash",
@@ -724,6 +778,7 @@ Loop through comment IDs and reply to each:
 ```
 
 **Query specific repository:**
+
 ```json
 {
   "program": "bash",
@@ -743,6 +798,7 @@ Loop through comment IDs and reply to each:
 #### Chaining Multiple Operations
 
 **Fetch comments, then process with jq:**
+
 ```json
 # Step 1: Fetch comments
 {
@@ -774,6 +830,7 @@ Loop through comment IDs and reply to each:
 #### Error Handling
 
 Always check `exit_code` in the response:
+
 ```json
 {
   "program": "bash",
@@ -796,6 +853,7 @@ If `exit_code` is non-zero, check `stderr` for error details.
 #### Handling Large Outputs
 
 For operations that produce large output (> 100KB), use `output_file`:
+
 ```json
 {
   "program": "bash",
@@ -816,6 +874,7 @@ Then read the file separately or process it with subsequent `jq` commands.
 #### Using stdin_input for Piping
 
 Pass data to program via stdin:
+
 ```json
 {
   "program": "jq",
@@ -827,13 +886,16 @@ Pass data to program via stdin:
 ### MCP Troubleshooting
 
 **Script not found error:**
+
 ```
 exit_code: 127
 stderr: "bash: scripts/get_pr_bot_review_comments.sh: No such file or directory"
 ```
+
 **Solution**: Ensure scripts are copied to workspace directory and path is correct relative to workspace root.
 
 **Output truncated warning:**
+
 ```
 {
   "exit_code": 0,
@@ -841,36 +903,47 @@ stderr: "bash: scripts/get_pr_bot_review_comments.sh: No such file or directory"
   "truncated": true
 }
 ```
+
 **Solution**: Use `output_file` parameter to redirect output to a file and avoid 100KB truncation limit.
 
 **Timeout error:**
+
 ```
 exit_code: 124
 stderr: "signal: killed"
 ```
+
 **Solution**: Increase `timeout` parameter (max 300 seconds) for long-running operations.
 
 **Path traversal blocked:**
+
 ```
 stderr: "Error: path traversal attempt detected"
 ```
+
 **Solution**: Use relative paths only. Paths like `../` or absolute paths are blocked for security.
 
 **Permission denied errors:**
+
 ```
 exit_code: 1
 stderr: "permission denied: scripts/get_pr_bot_review_comments.sh"
 ```
+
 **Solutions:**
+
 - Ensure scripts have execute permissions: `chmod +x scripts/*.sh`
 - Check file ownership and permissions in the workspace directory
 
 **JSON parsing errors with jq:**
+
 ```
 exit_code: 1
 stderr: "jq: parse error: Invalid JSON"
 ```
+
 **Solutions:**
+
 - Verify the input file contains valid JSON: `cat file.json | jq .`
 - Check that previous command succeeded before piping to jq
 - Use `output_file` to inspect intermediate outputs for debugging
