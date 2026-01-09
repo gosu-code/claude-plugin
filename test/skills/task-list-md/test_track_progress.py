@@ -599,7 +599,8 @@ class TestTrackProgress(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
 
             # Verify JSON response format (should block Claude from stopping)
-            response = json.loads(result.stdout.strip())
+            # Exit code 2 outputs to stderr for error convention
+            response = json.loads(result.stderr.strip())
             self.assertIn("decision", response)
             self.assertEqual(response["decision"], "block")
             self.assertIn("reason", response)
@@ -629,7 +630,8 @@ class TestTrackProgress(unittest.TestCase):
         result = subprocess.run(cmd, input=json.dumps(hook_input), text=True, capture_output=True)
 
         self.assertEqual(result.returncode, 2)
-        response = json.loads(result.stdout.strip())
+        # Exit code 2 outputs to stderr for error convention
+        response = json.loads(result.stderr.strip())
         self.assertIn("hookSpecificOutput", response)
         hook_output = response["hookSpecificOutput"]
         self.assertEqual(hook_output.get("hookEventName"), "SessionStart")

@@ -541,12 +541,15 @@ class ProgressTracker:
             return True
 
     def output_claude_hook_response(self, block: bool, reason: str = ""):
-        """Output JSON response for Claude hook mode
+        """Build JSON response for Claude hook mode
 
         Args:
             block: If True, output decision="block" to prevent Claude from stopping.
                    If False, omit decision key to allow Claude to stop.
             reason: Reason message. Required when block=True, ignored when block=False.
+
+        Returns:
+            str: JSON string response
         """
         response = {}
         if block:
@@ -555,19 +558,24 @@ class ProgressTracker:
         else:
             response["reason"] = ""
 
-        print(json.dumps(response))
-        sys.stdout.flush()
+        return json.dumps(response)
 
     def output_claude_hook_session_start_response(self, reason: str):
-        """Output JSON response for Claude SessionStart hook"""
+        """Build JSON response for Claude SessionStart hook
+
+        Args:
+            reason: Additional context for the SessionStart event
+
+        Returns:
+            str: JSON string response
+        """
         response = {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
                 "additionalContext": reason,
             }
         }
-        print(json.dumps(response))
-        sys.stdout.flush()
+        return json.dumps(response)
 
 
 class TaskParser:
@@ -2634,9 +2642,11 @@ def main():
                                 file=sys.stderr,
                             )
                             # Output JSON response for Claude hook (allow Claude to stop)
-                            task_parser.progress_tracker.output_claude_hook_response(
+                            response = task_parser.progress_tracker.output_claude_hook_response(
                                 block=False
                             )
+                            print(response)
+                            sys.stdout.flush()
                             sys.exit(1)
                     else:
                         # No transcript path, use exit code 1 to be safe
@@ -2645,9 +2655,13 @@ def main():
                             file=sys.stderr,
                         )
                         # Output JSON response for Claude hook (allow Claude to stop)
-                        task_parser.progress_tracker.output_claude_hook_response(
-                            block=False
+                        response = (
+                            task_parser.progress_tracker.output_claude_hook_response(
+                                block=False
+                            )
                         )
+                        print(response)
+                        sys.stdout.flush()
                         sys.exit(1)
 
             # Proceed with normal tracking condition check
@@ -2685,15 +2699,20 @@ def main():
                     )
                     if is_session_start and hook_input.get("source") == "compact":
                         reason_message += '\n\nSYSTEM: You MUST use `mcp__gosu__get_prompt` tool to retrieve the prompt with id: "workflow-of-command-task-list-md-execute" and follow the workflow step by steps. You should start from **Phase 2: Execute Tasks One by One**'
+                    # Exit code 2: output to stderr for both SessionStart and Stop
                     if is_session_start:
-                        task_parser.progress_tracker.output_claude_hook_session_start_response(
+                        response = task_parser.progress_tracker.output_claude_hook_session_start_response(
                             reason_message
                         )
+                        print(response)
                         sys.exit(0)  # SessionStart always expect exitcode 0
                     else:
-                        task_parser.progress_tracker.output_claude_hook_response(
-                            block=True, reason=reason_message
+                        response = (
+                            task_parser.progress_tracker.output_claude_hook_response(
+                                block=True, reason=reason_message
+                            )
                         )
+                        print(response, file=sys.stderr)
                 else:
                     # Normal mode: print to stderr
                     print(reason_message, file=sys.stderr)
@@ -2703,13 +2722,17 @@ def main():
                 if is_claude_hook_mode:
                     # Output JSON response for Claude hook (allow Claude to stop)
                     if is_session_start:
-                        task_parser.progress_tracker.output_claude_hook_session_start_response(
+                        response = task_parser.progress_tracker.output_claude_hook_session_start_response(
                             ""
                         )
                     else:
-                        task_parser.progress_tracker.output_claude_hook_response(
-                            block=False
+                        response = (
+                            task_parser.progress_tracker.output_claude_hook_response(
+                                block=False
+                            )
                         )
+                    print(response)
+                    sys.stdout.flush()
                 else:
                     print("All completion conditions are satisfied.")
 

@@ -84,15 +84,6 @@
             "timeout": 65
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/task-list-md/scripts/task_list_md.py track-progress check --claude-hook",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "SubagentStop": [
@@ -124,16 +115,6 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session_hook.py",
             "timeout": 65
-          }
-        ]
-      },
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/task-list-md/scripts/task_list_md.py track-progress check --claude-hook",
-            "timeout": 10
           }
         ]
       }
