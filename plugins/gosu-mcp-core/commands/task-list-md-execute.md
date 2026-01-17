@@ -57,7 +57,19 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
   - If the session ID is invalid, display an error message and stop execution.
   - This argument requires `--task-file` to also be specified (needed for hook commands).
 
-2. **COMMAND Pre-Execution: Session Hook Setup** (only when `--session-hook` is provided):
+2. **COMMAND Pre-Execution: Analyze Task List**
+
+**Step 1: Understand Implementation Plan and Validate Task Structure**
+
+- Use `task_list_md.py list-tasks [task_file_path]` to list all existing tasks in the markdown file
+- Use `task_list_md.py check-dependencies [task_file_path]` to validate all task dependencies
+  - If there are invalid dependencies, report them to the user and stop execution
+- Check the overall task structure and hierarchy
+  - Verify task IDs follow the hierarchical format (e.g., "1", "1.1", "1.2.3")
+  - Identify any missing or incomplete task descriptions
+- If the task file is empty or has major structural issues, stop the execution and return an error message to the user.
+
+3. **COMMAND Pre-Execution: Session Hook Setup** (only when `--session-hook` is provided):
 
 This step sets up session-scoped hooks that will automatically check task progress. These hooks activate immediately without restarting Claude Code.
 
@@ -128,15 +140,13 @@ This step sets up session-scoped hooks that will automatically check task progre
 - If verification fails, display error and stop execution
 - Display success message: "Session hooks created at ./.claude/hooks/hooks.[session_id].json"
 
-Proceed to "2. COMMAND Execution Process"
-
-3. **COMMAND Execution Process**:
+4. **COMMAND Execution Process**:
 
 - You must use `mcp__gosu__get_prompt` tool to retrieve the prompt with id: "workflow-of-command-task-list-md-execute" to be used as the workflow of this command execution process.
 - Follow the multi-phase execution process defined in the retrieved workflow, executing each phase step by step as described.
 - When unable to retrieve the workflow, MUST stop execution and return an error message to the user indicating the failure to retrieve the workflow.
 
-4. **COMMAND Non-Stop Execution Mode**:
+5. **COMMAND Non-Stop Execution Mode**:
 
 - Follow similar to steps in normal execution mode as defined in "2. COMMAND Execution Process".
 - However, in non-stop mode, when you have completed all your tasks and there is no more pending task to do, you MUST not stop the execution.
@@ -144,15 +154,15 @@ Proceed to "2. COMMAND Execution Process"
 - When you receive the next task assignment, you MUST execute the task as normal follow the steps defined in the retrieved workflow.
 - Repeat this process until the output of `task_list_md.py get-next-task --wait 8h` is "All tasks have been completed! No more pending tasks." or "Wait duration of 28800s expired." shown in the command output.
 
-5. **COMMAND Output Management**:
+6. **COMMAND Output Management**:
 
 - Progress for tasks is automatically tracked in `.tasks.local.json` by the script
-- Create a reports directory if needed with `mkdir -p docs/reports`, all reports will be saved here
+- Create a reports directory if needed with `mkdir -p .claude/reports`, all reports will be saved here
 
-6. **Interactions With Other Claude Slash Commands**:
+7. **Interactions With Other Claude Slash Commands**:
 
 - No interactions.
 
-7. **Interactions With Claude Subagents**:
+8. **Interactions With Claude Subagents**:
 
 - Refer to the interactions defined in the "workflow-of-task-list-md-execute" workflow retrieved in Step 2.
