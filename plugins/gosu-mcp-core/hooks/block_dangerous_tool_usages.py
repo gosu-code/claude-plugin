@@ -582,13 +582,17 @@ def main():
             )
             return
 
-        # Check for .env file access (ask user for confirmation)
+        # Check for .env file access (ask user for confirmation or auto-allow)
         if is_env_file_access(tool_name, tool_input):
-            output_unified_decision(
-                hook_event,
-                "ask",
-                reason="This tool is attempting to access .env files which may contain sensitive data. Do you want to allow this access?"
-            )
+            # If auto-allow is enabled, allow .env file access without asking
+            if args.and_auto_allow:
+                output_unified_decision(hook_event, "allow")
+            else:
+                output_unified_decision(
+                    hook_event,
+                    "ask",
+                    reason="This tool is attempting to access .env files which may contain sensitive data. Do you want to allow this access?"
+                )
             return
 
         # Check for dangerous rm -rf commands
