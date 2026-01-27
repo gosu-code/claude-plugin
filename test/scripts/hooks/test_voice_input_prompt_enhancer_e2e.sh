@@ -43,13 +43,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 # Script path
 HOOK_SCRIPT_PATH="$PROJECT_ROOT/plugins/voice-coding/hooks/voice_input_prompt_enhancer.py"
+# Use actual project root as default cwd for tests
+DEFAULT_CWD="$PROJECT_ROOT"
 
 # Function to test if hook triggers correctly
 test_hook() {
     local test_name="$1"
     local prompt="$2"
     local should_trigger="$3"
-    local cwd="${4:-/workspaces/gosu-mcp-server}"
+    local cwd="${4:-$DEFAULT_CWD}"
 
     printf "%-50s " "Test: $test_name ..."
 
@@ -94,7 +96,7 @@ test_hook_content() {
     local test_name="$1"
     local prompt="$2"
     local expected_content="$3"
-    local cwd="${4:-/workspaces/gosu-mcp-server}"
+    local cwd="${4:-$DEFAULT_CWD}"
 
     printf "%-50s " "Test: $test_name ..."
 
@@ -143,6 +145,14 @@ test_hook "Plain placeholder" "Update placeholder in code" "yes"
 test_hook "Place holder with space" "Fix place holder here" "yes"
 
 echo ""
+echo "--- Nameholder Pattern Tests ---"
+test_hook "Bracket nameholder" "Update [nameholder] variable" "yes"
+test_hook "Angle bracket nameholder" "Fix <nameholder> function" "yes"
+test_hook "Curly brace nameholder" "Check {nameholder} method" "yes"
+test_hook "Plain nameholder" "Update nameholder constant" "yes"
+test_hook "Name holder with space" "Fix name holder here" "yes"
+
+echo ""
 echo "--- Ellipsis Pattern Tests ---"
 test_hook "Three dots" "Update files in src/..." "yes"
 test_hook "Unicode ellipsis" "Fix bugs in handlers… controllers" "yes"
@@ -167,16 +177,23 @@ test_hook "Bug fix" "Fix bug in parser" "no"
 
 echo ""
 echo "--- Content Validation Tests ---"
-test_hook_content "Placeholder count" "Update [placeholder] and <placeholder>" "2 placeholders"
+test_hook_content "Placeholder count" "Update [placeholder] and <placeholder>" "2 placeholder"
+test_hook_content "Nameholder count" "Update [nameholder] and {nameholder}" "2 nameholder"
 test_hook_content "Ellipsis count" "Update src/... and test/... etc" "3 ellipsis pattern"
 test_hook_content "Ellipsis instructions" "Update files in src/..." "infer and fill in"
-test_hook_content "General guidance" "Update placeholder" "Glob tool"
+test_hook_content "Placeholder instructions" "Update [placeholder]" "All must be replaced with relevant file/directory paths"
+test_hook_content "Nameholder instructions" "Update [nameholder]" "All must be replaced with the name of a symbol"
+test_hook_content "LSP tool guidance" "Update placeholder" "LSP tool"
+test_hook_content "Glob tool guidance" "Update placeholder" "Glob tool"
+test_hook_content "Grep tool guidance" "Update placeholder" "Grep tool"
 
 echo ""
 echo "--- Multiple Pattern Tests ---"
 test_hook "Placeholder + Ellipsis" "Update [placeholder] in src/..." "yes"
+test_hook "Nameholder + Ellipsis" "Call [nameholder] for handlers... controllers" "yes"
+test_hook "Placeholder + Nameholder" "Update [placeholder] with [nameholder] function" "yes"
 test_hook "Ellipsis + File ref" "Update files in src/... in this directory" "yes"
-test_hook "All patterns" "Update [placeholder] in src/... in this file" "yes"
+test_hook "All patterns" "Update [placeholder] in src/... calling [nameholder] in this file" "yes"
 
 echo ""
 echo "--- Edge Case Tests ---"

@@ -50,7 +50,9 @@ PLACEHOLDER_PATTERNS = [
 
 # Nameholder patterns - detect various nameholder formats for code symbols
 NAMEHOLDER_PATTERNS = [
-    re.compile(r"\$\{name\s*holder\}", re.IGNORECASE),  # ${nameholder}
+    re.compile(r"\[name\s*holder\]", re.IGNORECASE),  # [nameholder]
+    re.compile(r"\<name\s*holder\>", re.IGNORECASE),  # <nameholder>
+    re.compile(r"\{name\s*holder\}", re.IGNORECASE),  # {nameholder}
     re.compile(r"\"name\s*holder\"", re.IGNORECASE),  # "nameholder"
     re.compile(r"'name\s*holder'", re.IGNORECASE),  # 'nameholder'
     re.compile(
@@ -126,7 +128,7 @@ def should_enhance_prompt(prompt: str) -> bool:
 
     Checks four categories of patterns:
     - PLACEHOLDER_PATTERNS: [placeholder], <placeholder>, etc.
-    - NAMEHOLDER_PATTERNS: ${nameholder}, "nameholder", etc.
+    - NAMEHOLDER_PATTERNS: [nameholder], "nameholder", etc.
     - ELLIPSIS_PATTERNS: ..., etc, and so on, etc.
     - TRIGGER_PATTERNS: in this file, to this directory, etc.
     """
@@ -227,12 +229,12 @@ def count_nameholders(prompt: str) -> int:
     """
     Count the number of nameholder tokens in the prompt.
     Uses same logic as count_placeholders to avoid double-counting.
-    Supports various nameholder formats: ${nameholder}, "nameholder", 'nameholder', etc.
+    Supports various nameholder formats: [nameholder], "nameholder", 'nameholder', etc.
     """
     nameholder_count = 0
     cleaned_prompt = prompt
 
-    # Remove formatted nameholders first (patterns 0-2: ${nameholder}, "nameholder", 'nameholder')
+    # Remove formatted nameholders first (patterns 0-2: [nameholder], "nameholder", 'nameholder')
     for pattern in NAMEHOLDER_PATTERNS[:3]:
         cleaned_prompt = pattern.sub("", cleaned_prompt)
         nameholder_count += len(pattern.findall(prompt))
@@ -301,7 +303,7 @@ def generate_prompt_enhancing_instructions(
     # Handle nameholder-specific suggestions
     if any(term in prompt_lower for term in ["nameholder", "name holder"]):
         suggestions.append(
-            "Identify all nameholder in the prompt eg. ${nameholder}, \"nameholder\", 'nameholder', etc. Use the related keywords (before/after the nameholder) to search for relevant code symbols."
+            "Identify all nameholder in the prompt eg. [nameholder], \"nameholder\", 'nameholder', etc. Use the related keywords (before/after the nameholder) to search for relevant code symbols."
         )
 
         # Count number of nameholders in the prompt using compiled patterns

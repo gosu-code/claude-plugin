@@ -85,6 +85,23 @@ class TestShouldEnhancePrompt(unittest.TestCase):
                     f"Should trigger for: {description}"
                 )
 
+    def test_nameholder_patterns(self):
+        """Test that nameholder patterns trigger enhancement."""
+        test_cases = [
+            ("Update [nameholder] variable", "Bracket nameholder"),
+            ("Fix <nameholder> function", "Angle bracket nameholder"),
+            ("Check {nameholder} method", "Curly brace nameholder"),
+            ("Update nameholder constant", "Plain nameholder"),
+            ("Update name holder in code", "Name holder with space"),
+        ]
+
+        for prompt, description in test_cases:
+            with self.subTest(description=description):
+                self.assertTrue(
+                    should_enhance_prompt(prompt),
+                    f"Should trigger for: {description}"
+                )
+
     def test_trigger_patterns(self):
         """Test that file/directory reference patterns trigger enhancement."""
         test_cases = [
@@ -164,6 +181,46 @@ class TestCountPlaceholders(unittest.TestCase):
         # The pattern looks for exact "placeholder" or "place holder", not variations
         self.assertEqual(count_placeholders("[placeholder]text"), 1)
         self.assertEqual(count_placeholders("text[placeholder]"), 1)
+
+
+class TestCountNameholders(unittest.TestCase):
+    """Test the count_nameholders function."""
+
+    def test_single_nameholder(self):
+        """Test counting single nameholder patterns."""
+        self.assertEqual(count_nameholders("Update [nameholder]"), 1)
+        self.assertEqual(count_nameholders("Fix <nameholder>"), 1)
+        self.assertEqual(count_nameholders("Check {nameholder}"), 1)
+
+    def test_multiple_nameholders(self):
+        """Test counting multiple nameholders."""
+        prompt = "Update [nameholder] and {nameholder} functions"
+        self.assertEqual(count_nameholders(prompt), 2)
+
+    def test_no_nameholders(self):
+        """Test prompts without nameholders."""
+        self.assertEqual(count_nameholders("Update the config file"), 0)
+        self.assertEqual(count_nameholders("Add new feature"), 0)
+        # Plain text "nameholder" without delimiters is not counted
+        self.assertEqual(count_nameholders("Update nameholder"), 0)
+
+    def test_case_insensitive(self):
+        """Test that nameholder detection is case insensitive for formatted patterns."""
+        self.assertEqual(count_nameholders("Update [NameHolder]"), 1)
+        self.assertEqual(count_nameholders("Update <NameHolder>"), 1)
+        self.assertEqual(count_nameholders("Update {NameHolder}"), 1)
+
+    def test_avoid_double_counting(self):
+        """Test that nested/formatted nameholders aren't double counted."""
+        self.assertEqual(count_nameholders("[nameholder]"), 1)
+        self.assertEqual(count_nameholders("<nameholder>"), 1)
+        self.assertEqual(count_nameholders("{nameholder}"), 1)
+
+    def test_mixed_nameholder_formats(self):
+        """Test counting different nameholder formats together."""
+        prompt = "Update [nameholder] and {nameholder} and <nameholder>"
+        # Should count all three formatted nameholders
+        self.assertEqual(count_nameholders(prompt), 3)
 
 
 class TestCountEllipsis(unittest.TestCase):
@@ -439,6 +496,34 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
 
         self.assertIn("3 ellipsis pattern", instructions)
 
+    def test_nameholder_instructions(self):
+        """Test instructions generated for nameholder patterns."""
+        context = {
+            "project_files": ["go.mod"],
+            "common_dirs": ["test"],
+            "project_name": "test-project"
+        }
+        prompt = "Update [nameholder] in the code"
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
+
+        self.assertIn("nameholder", instructions.lower())
+        self.assertIn("symbol", instructions.lower())
+        self.assertIn("Grep tool", instructions)
+        self.assertIn("LSP tool", instructions)
+
+    def test_nameholder_count_in_instructions(self):
+        """Test that nameholder count is correctly reported."""
+        context = {
+            "project_files": [],
+            "common_dirs": [],
+            "project_name": "test"
+        }
+        prompt = "Update [nameholder] and {nameholder}"
+        instructions = generate_prompt_enhancing_instructions(prompt, context)
+
+        self.assertIn("2 nameholder(s)", instructions)
+        self.assertIn("replaced with the name of a symbol", instructions)
+
 
 class TestEdgeCases(unittest.TestCase):
     """Test edge cases and boundary conditions."""
@@ -503,9 +588,28 @@ class TestMixedPatterns(unittest.TestCase):
         self.assertEqual(count_placeholders(prompt), 1)
         self.assertEqual(count_ellipsis(prompt), 1)
 
+    def test_nameholder_and_ellipsis(self):
+        """Test prompt with both nameholder and ellipsis."""
+        prompt = "Call [nameholder] for handlers... controllers"
+        self.assertTrue(should_enhance_prompt(prompt))
+        self.assertEqual(count_nameholders(prompt), 1)
+        self.assertEqual(count_ellipsis(prompt), 1)
+
+    def test_placeholder_and_nameholder(self):
+        """Test prompt with both placeholder and nameholder."""
+        prompt = "Update [placeholder] with [nameholder] function"
+        self.assertTrue(should_enhance_prompt(prompt))
+        self.assertEqual(count_placeholders(prompt), 1)
+        self.assertEqual(count_nameholders(prompt), 1)
+
     def test_placeholder_and_trigger(self):
         """Test prompt with placeholder and file reference."""
         prompt = "Update [placeholder] in this file"
+        self.assertTrue(should_enhance_prompt(prompt))
+
+    def test_nameholder_and_trigger(self):
+        """Test prompt with nameholder and file reference."""
+        prompt = "Update [nameholder] in this file"
         self.assertTrue(should_enhance_prompt(prompt))
 
     def test_ellipsis_and_trigger(self):
@@ -515,9 +619,10 @@ class TestMixedPatterns(unittest.TestCase):
 
     def test_all_patterns_combined(self):
         """Test prompt with all pattern types."""
-        prompt = "Update [placeholder] files in src/... and etc in this directory"
+        prompt = "Update [placeholder] files in src/... calling [nameholder] and etc in this directory"
         self.assertTrue(should_enhance_prompt(prompt))
         self.assertEqual(count_placeholders(prompt), 1)
+        self.assertEqual(count_nameholders(prompt), 1)
         # Should count both '...' and 'etc'
         self.assertGreaterEqual(count_ellipsis(prompt), 2)
 
@@ -529,6 +634,13 @@ class TestMixedPatterns(unittest.TestCase):
         self.assertEqual(count_placeholders(prompt), 2)
         self.assertEqual(count_ellipsis(prompt), 3)  # ... + ... + etc
 
+    def test_multiple_nameholders_and_placeholders(self):
+        """Test with multiple nameholders and placeholders."""
+        prompt = "Update [nameholder] and {nameholder} in [placeholder] and <placeholder>"
+        self.assertTrue(should_enhance_prompt(prompt))
+        self.assertEqual(count_nameholders(prompt), 2)
+        self.assertEqual(count_placeholders(prompt), 2)
+
     def test_mixed_instructions_generation(self):
         """Test instruction generation with mixed patterns."""
         context = {
@@ -536,11 +648,12 @@ class TestMixedPatterns(unittest.TestCase):
             "common_dirs": ["test", "src"],
             "project_name": "test-project"
         }
-        prompt = "Update test [placeholder] files in src/... etc"
+        prompt = "Update test [placeholder] files calling [nameholder] in src/... etc"
         instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # Should include all relevant suggestions
         self.assertIn("placeholder", instructions.lower())
+        self.assertIn("nameholder", instructions.lower())
         self.assertIn("ellipsis", instructions.lower())
         self.assertIn("test", instructions.lower())
 
@@ -554,18 +667,20 @@ class TestMixedPatterns(unittest.TestCase):
         # Simulate voice input with multiple triggers
         prompt = (
             "Update the test files in [placeholder] directory and also "
-            "the service handlers in src/services/... and util functions etc "
-            "and make sure to update in this file as well"
+            "the service handlers in src/services/... calling [nameholder] function "
+            "and util functions etc and make sure to update in this file as well"
         )
         instructions = generate_prompt_enhancing_instructions(prompt, context)
 
         # Should detect all patterns
         self.assertIn("1 placeholder(s)", instructions)  # [placeholder]
+        self.assertIn("1 nameholder(s)", instructions)  # [nameholder]
         self.assertIn("2 ellipsis pattern", instructions)  # ... and etc
         self.assertIn("test", instructions.lower())
         self.assertIn("service", instructions.lower())
         self.assertIn("util", instructions.lower())
         self.assertIn("Glob tool", instructions)
+        self.assertIn("LSP tool", instructions)
 
 
 class TestProjectContextEdgeCases(unittest.TestCase):

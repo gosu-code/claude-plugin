@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# AI files
+mind.mv2
+mind.mv2.lock
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
