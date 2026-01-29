@@ -1,20 +1,24 @@
 {
   "name": "codex-mcp",
   "description": "A plugin to integrate Codex CLI as a companion AI Agent to Claude Code via MCP server",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "author": {
     "name": "Gosu Team",
     "email": "0xgosu@gmail.com"
   },
   "license": "AGPL3",
-  "keywords": ["codex-cli", "agent", "mcp"],
+  "keywords": [
+    "codex-cli",
+    "agent",
+    "mcp"
+  ],
   "mcpServers": {
     "codex": {
-			"type": "stdio",
-			"command": "codex",
-			"args": [
-				"mcp-server"
-			]
-		}
-	}
+      "type": "stdio",
+      "command": "codex",
+      "args": [
+        "mcp-server"
+      ]
+    }
+  }
 }
