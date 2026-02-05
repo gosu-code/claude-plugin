@@ -110,7 +110,7 @@ To remove the hooks, simply delete the session hook file:
                "type": "json",
                "json": {
                  "decision": "block",
-                 "reason": "Must run the following command: `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work."
+                 "reason": "Must run the following command: `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md` (Do not attempt to kill/abort the python script command. Do not read/update the task file directly by yourself). You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work. When no tasks available to work on, must run SlashCommand `/gdd:generate-tasks <goal-name>`"
                }
              }
            ]
@@ -125,7 +125,7 @@ To remove the hooks, simply delete the session hook file:
                "json": {
                  "hookSpecificOutput": {
                    "hookEventName": "SessionStart",
-                   "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use this python script `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md [task-id] [status]` to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`</system-prompt>"
+                   "additionalContext": "<system-prompt>Read & understand the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory before you do any task. Use this python script `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md [task-id] [status]` to change task status as you progress. Start working: \"pending\" -> \"in-progress\", Completion: \"in-progress\" -> \"review\". Before working on a task, use subagent `Plan` to create a detailed implementation plan for the current task. After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run this `general-purpose` subagent in background (task verification) then once its finish, update the task status according to the result from subagent. Mark \"review\" task as \"done\" only when it is truly completed. If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`</system-prompt>"
                  }
                }
              }
@@ -151,20 +151,26 @@ To remove the hooks, simply delete the session hook file:
 ### Phase 5: Start Working Toward the Goal
 
 1. **Understand Goal & Constraints**
-
-- Read the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory
-- Run: `<SCRIPT_PATH> get-next-task docs/goal/<goal-name>/tasks.md` to pick up a first task to work on
-- After receiving the task ID from `get-next-task`, always run: `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details
-- Do not read/update the task file directly by yourself. Always use `task_list_md.py` script to do so
+   - Read the `goal.md` and `constraints.md` in the `docs/goal/<goal-name>/` directory
+   - Run: `<SCRIPT_PATH> get-next-task docs/goal/<goal-name>/tasks.md` to pick up a first task to work on
+   - After receiving the task ID from `get-next-task`, always run: `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details
+   - When `get-next-task` indicate there is no tasks available to work on, must run SlashCommand `/gdd:generate-tasks <goal-name>`
+   - Do not read/update the task file directly by yourself. Always use `task_list_md.py` script to do so
 
 2. **Start Working**
 
 - Use `<SCRIPT_PATH>` to change task status as you progress:
   - Start working: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> in-progress`
   - Completion: `<SCRIPT_PATH> set-status docs/goal/<goal-name>/tasks.md <task-id> review`
-- After complete a task, use subagent `general-purpose` to verify and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
+- Before start working on a task, Use subagent `Plan` to create a detailed implementation plan for the current task with `<task-id>`, considering its description, requirements, and dependencies.
+  - If the task has dependencies, include the information from dependent tasks in the plan (run `show-task` for each dependency)
+  - If the task is a parent task with sub-tasks, ensure the plan accounts for completing all sub-tasks as well
+  - The plan should outline clear steps, resources needed and focus on implementation details specific to the current task
+  - The plan should also include verification steps to confirm task completion (to be used by subagent `general-purpose` below)
+- Then complete the current task following the implementation plan output from the subagent `Plan`
+- After complete a task, use subagent `general-purpose` to verify (follow steps provided by subagent `Plan` earlier) and evaluate the true status of the task. Run the subagent in background then once its finish, update the task status according to the result from subagent. Mark "review" task as "done" only when it is truly completed
 - If all remaining tasks are completed or there is no more pending tasks, must run SlashCommand `/gdd:generate-tasks <goal-name>`
-- Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work
+- Else, must run `<SCRIPT_PATH> get-next-task --wait 1h docs/goal/<goal-name>/tasks.md`. You must patiently wait for the next task assignment from the command output. After receiving the task ID, always run `<SCRIPT_PATH> show-task docs/goal/<goal-name>/tasks.md <task-id>` to see the full task details before starting work. When no tasks available to work on, must run SlashCommand `/gdd:generate-tasks <goal-name>`
 
 **Note**: `<SCRIPT_PATH>` is the resolved absolute path from Phase 2 step 3 (e.g., `/Users/username/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/skills/task-list-md/scripts/task_list_md.py`)
 
