@@ -129,6 +129,17 @@
           }
         ]
       }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/create_git_worktree.py --claude-hook",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

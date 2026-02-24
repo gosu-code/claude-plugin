@@ -27,6 +27,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 class GitWorktreeCreator:
     def __init__(self, args):
         self.args = args
-        self.main_workspace = Path.cwd()
+        self.main_workspace = Path(args.cwd_override) if getattr(args, 'cwd_override', None) else Path.cwd()
         # Support a customizable worktree parent directory
         self.worktree_parent_dir = Path(args.worktree_parent_dir or '.')
         self.worktree_dir: Path = self.worktree_parent_dir / 'worktree'
@@ -459,6 +460,62 @@ class GitWorktreeCreator:
             logger.error(f"Failed to create worktree: {e}")
             sys.exit(1)
 
+def run_as_claude_hook():
+    """Run as a Claude Code WorktreeCreate hook.
+
+    Reads JSON payload from stdin, creates a worktree, and prints the
+    absolute worktree path to stdout on success. Exits with code 1 on failure.
+    """
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error(f"Failed to parse JSON from stdin: {e}")
+        sys.exit(1)
+
+    hook_event = payload.get('hook_event_name', '')
+    if hook_event != 'WorktreeCreate':
+        logger.error(f"Unexpected hook event: {hook_event}, expected WorktreeCreate")
+        sys.exit(1)
+
+    cwd = payload.get('cwd')
+    if not cwd:
+        logger.error("Missing 'cwd' field in hook payload")
+        sys.exit(1)
+
+    # Map the optional 'name' field to prompt words for branch name generation
+    name = payload.get('name', '')
+    prompt_words = name.split() if name else []
+
+    args = argparse.Namespace(
+        prompt=prompt_words,
+        branch=None,
+        worktree=None,
+        base_branch=None,
+        plan_file=None,
+        agent_user=None,
+        copy_staged=True,
+        copy_modified=False,
+        copy_untracked=False,
+        worktree_parent_dir=str(Path(cwd).parent),
+        verbose=False,
+        cwd_override=cwd,
+    )
+
+    # Required: copy_staged_files/copy_non_staged_modified_files/copy_untracked_files
+    # call run_command() without cwd, so they rely on the process working directory.
+    os.chdir(cwd)
+
+    try:
+        creator = GitWorktreeCreator(args)
+        creator.run()
+        print(str(creator.worktree_dir.resolve()))
+    except SystemExit:
+        raise
+    except Exception as e:
+        logger.error(f"Hook failed: {e}")
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Create and configure git worktrees')
     parser.add_argument('prompt', nargs='*', help='Task description prompt (used to generate branch name if --branch not specified)')
@@ -480,7 +537,12 @@ def main():
         default=str(Path.cwd().parent),
         help='Parent directory in which to place the worktree (default: parent of current directory)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--claude-hook', action='store_true',
+                        help='Run as Claude Code WorktreeCreate hook (reads JSON from stdin; all other arguments are ignored)')
     args = parser.parse_args()
+    if args.claude_hook:
+        run_as_claude_hook()
+        return
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     creator = GitWorktreeCreator(args)

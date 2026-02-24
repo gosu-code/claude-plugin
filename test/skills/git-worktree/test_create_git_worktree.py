@@ -32,6 +32,7 @@ import unittest
 import tempfile
 import shutil
 import subprocess
+import json
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock, call
 import sys
@@ -1035,6 +1036,146 @@ class TestGitWorktreeCreator(unittest.TestCase):
                         creator.create_worktree()
 
                     self.assertIn("not found", str(context.exception))
+
+
+class TestClaudeHookMode(unittest.TestCase):
+    """Test suite for --claude-hook mode (WorktreeCreate hook)"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.main_workspace = Path(self.temp_dir) / "main_workspace"
+        self.main_workspace.mkdir()
+
+        # Initialize a git repo
+        subprocess.run(['git', 'init'], cwd=self.main_workspace, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=self.main_workspace, capture_output=True, check=True)
+        subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=self.main_workspace, capture_output=True, check=True)
+        subprocess.run(['git', 'checkout', '-b', 'main'], cwd=self.main_workspace, capture_output=True)
+
+        # Create initial commit
+        test_file = self.main_workspace / "README.md"
+        test_file.write_text("# Test Repo")
+        subprocess.run(['git', 'add', 'README.md'], cwd=self.main_workspace, capture_output=True, check=True)
+        subprocess.run(['git', 'commit', '-m', 'Initial commit'], cwd=self.main_workspace, capture_output=True, check=True)
+
+    def tearDown(self):
+        """Clean up test fixtures"""
+        # Clean up any worktrees first
+        try:
+            result = subprocess.run(['git', 'worktree', 'list'],
+                                    cwd=self.main_workspace,
+                                    capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if line and str(self.main_workspace) not in line:
+                        worktree_path = line.split()[0]
+                        subprocess.run(['git', 'worktree', 'remove', worktree_path, '--force'],
+                                       cwd=self.main_workspace,
+                                       capture_output=True, check=False)
+        except Exception:
+            pass
+        shutil.rmtree(self.temp_dir)
+
+    def _run_hook(self, payload_dict):
+        """Helper to run the script in --claude-hook mode with given payload.
+
+        Returns (stdout, stderr, returncode).
+        """
+        script = str(script_path / "create_git_worktree.py")
+        payload = json.dumps(payload_dict)
+        result = subprocess.run(
+            [sys.executable, script, '--claude-hook'],
+            input=payload, capture_output=True, text=True,
+        )
+        return result.stdout.strip(), result.stderr, result.returncode
+
+    def test_run_as_claude_hook_success(self):
+        """Valid payload produces absolute worktree path on stdout, exit 0"""
+        payload = {
+            "session_id": "test-session",
+            "cwd": str(self.main_workspace),
+            "hook_event_name": "WorktreeCreate",
+            "name": "test-feature",
+        }
+        stdout, stderr, rc = self._run_hook(payload)
+        self.assertEqual(rc, 0, f"Expected exit 0, got {rc}. stderr: {stderr}")
+        # stdout should be a single absolute path
+        self.assertTrue(stdout, "Expected worktree path on stdout")
+        worktree_path = Path(stdout)
+        self.assertTrue(worktree_path.is_absolute(), f"Path should be absolute: {stdout}")
+        self.assertTrue(worktree_path.exists(), f"Worktree path should exist: {stdout}")
+
+    def test_run_as_claude_hook_invalid_json(self):
+        """Invalid JSON on stdin causes exit 1"""
+        script = str(script_path / "create_git_worktree.py")
+        result = subprocess.run(
+            [sys.executable, script, '--claude-hook'],
+            input="not valid json{{{",
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_run_as_claude_hook_wrong_event(self):
+        """Wrong hook_event_name causes exit 1"""
+        payload = {
+            "session_id": "test-session",
+            "cwd": str(self.main_workspace),
+            "hook_event_name": "SessionStart",
+            "name": "test",
+        }
+        stdout, stderr, rc = self._run_hook(payload)
+        self.assertEqual(rc, 1)
+        self.assertEqual(stdout, "")
+
+    def test_run_as_claude_hook_missing_cwd(self):
+        """Missing cwd field causes exit 1"""
+        payload = {
+            "session_id": "test-session",
+            "hook_event_name": "WorktreeCreate",
+            "name": "test",
+        }
+        stdout, stderr, rc = self._run_hook(payload)
+        self.assertEqual(rc, 1)
+        self.assertEqual(stdout, "")
+
+    def test_run_as_claude_hook_empty_name(self):
+        """Empty/missing name still works with default branch name"""
+        payload = {
+            "session_id": "test-session",
+            "cwd": str(self.main_workspace),
+            "hook_event_name": "WorktreeCreate",
+        }
+        stdout, stderr, rc = self._run_hook(payload)
+        self.assertEqual(rc, 0, f"Expected exit 0, got {rc}. stderr: {stderr}")
+        self.assertTrue(stdout, "Expected worktree path on stdout")
+        worktree_path = Path(stdout)
+        self.assertTrue(worktree_path.is_absolute())
+        self.assertTrue(worktree_path.exists())
+
+    def test_cwd_override_in_init(self):
+        """cwd_override sets main_workspace correctly"""
+        args = argparse.Namespace(
+            prompt=[], branch=None, worktree=None, base_branch=None,
+            plan_file=None, agent_user=None, copy_staged=True,
+            copy_modified=False, copy_untracked=False,
+            worktree_parent_dir=str(self.temp_dir), verbose=False,
+            cwd_override=str(self.main_workspace),
+        )
+        creator = GitWorktreeCreator(args)
+        self.assertEqual(creator.main_workspace, self.main_workspace)
+
+    def test_cwd_override_not_set(self):
+        """No cwd_override falls back to Path.cwd() (backward compat)"""
+        args = argparse.Namespace(
+            prompt=[], branch=None, worktree=None, base_branch=None,
+            plan_file=None, agent_user=None, copy_staged=True,
+            copy_modified=False, copy_untracked=False,
+            worktree_parent_dir=str(self.temp_dir), verbose=False,
+        )
+        creator = GitWorktreeCreator(args)
+        self.assertEqual(creator.main_workspace, Path.cwd())
 
 
 class TestGitWorktreeCreatorIntegration(unittest.TestCase):
