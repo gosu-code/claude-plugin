@@ -1100,9 +1100,10 @@ class TestClaudeHookMode(unittest.TestCase):
         }
         stdout, stderr, rc = self._run_hook(payload)
         self.assertEqual(rc, 0, f"Expected exit 0, got {rc}. stderr: {stderr}")
-        # stdout should be a single absolute path
-        self.assertTrue(stdout, "Expected worktree path on stdout")
-        worktree_path = Path(stdout)
+        # stdout must contain exactly one line: the absolute worktree path
+        lines = stdout.strip().split('\n')
+        self.assertEqual(len(lines), 1, f"Expected exactly one line on stdout, got {len(lines)}: {lines}")
+        worktree_path = Path(lines[0])
         self.assertTrue(worktree_path.is_absolute(), f"Path should be absolute: {stdout}")
         self.assertTrue(worktree_path.exists(), f"Worktree path should exist: {stdout}")
 
@@ -1149,8 +1150,10 @@ class TestClaudeHookMode(unittest.TestCase):
         }
         stdout, stderr, rc = self._run_hook(payload)
         self.assertEqual(rc, 0, f"Expected exit 0, got {rc}. stderr: {stderr}")
-        self.assertTrue(stdout, "Expected worktree path on stdout")
-        worktree_path = Path(stdout)
+        # stdout must contain exactly one line: the absolute worktree path
+        lines = stdout.strip().split('\n')
+        self.assertEqual(len(lines), 1, f"Expected exactly one line on stdout, got {len(lines)}: {lines}")
+        worktree_path = Path(lines[0])
         self.assertTrue(worktree_path.is_absolute())
         self.assertTrue(worktree_path.exists())
 
