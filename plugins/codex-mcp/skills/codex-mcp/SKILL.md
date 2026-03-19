@@ -14,16 +14,23 @@ Run a Codex session. Accepts configuration parameters matching the Codex Config 
 
 | Property                | Type   | Description                                                                                                                                            |
 | ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`prompt`** (required) | string | Initial user prompt that seeds the Codex conversation.                                                                                                 |
+| **`prompt`** (required) | string | The initial user prompt to start the Codex conversation.                                                                                                 |
 | `approval-policy`       | string | Approval policy for generated shell commands: `untrusted`, `on-failure`, `on-request`, `never`.                                                        |
 | `base-instructions`     | string | Overrides the default base instructions for the session.                                                                                               |
 | `compact-prompt`        | string | Prompt used when compacting the conversation.                                                                                                          |
 | `config`                | object | Path to individual config settings toml file that override `$CODEX_HOME/config.toml` (see [codex-config-toml-structure.md](references/codex-config-toml-structure.md) to understand how to create this file).                 |
 | `cwd`                   | string | Working directory for the session. Relative paths resolve from the server process root.                                                                |
 | `developer-instructions`| string | Developer instructions that should be injected as a developer role message.                                                                            |
-| `model`                 | string | Optional override for the model name (e.g., `gpt-5.1-codex-mini`, `gpt-5.2-codex`) default is `gpt-5-codex`.                                                                                       |
+| `model`                 | string | Optional override for the model name (e.g., `gpt-5.4-mini`, `gpt-5.4`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.2-codex`) default is `gpt-5.4`.                                                                                       |
 | `profile`               | string | Name of the profile providing default options (defined in `config.toml`).                                                                                           |
 | `sandbox`               | string | Sandbox mode: `read-only`, `workspace-write`, or `danger-full-access`.                                                                                 |
+
+**Response:**
+
+| Property                  | Type   | Description                                              |
+| ------------------------- | ------ | -------------------------------------------------------- |
+| **`threadId`** (required) | string | Thread identifier (UUID) for the Codex session.          |
+| **`content`** (required)  | string | The response content from the Codex session.             |
 
 ### mcp__codex__codex-reply
 
@@ -33,10 +40,18 @@ Continue a Codex session by providing the conversation id and follow-up prompt. 
 | ------------------------------- | ------ | -------------------------------------------------------- |
 | **`prompt`** (required)         | string | Next user prompt to continue the Codex conversation.     |
 | **`threadId`** (required)       | string | Identifier of the thread to continue. Must be a valid UUID (e.g., `019c08dc-ca4c-7a21-a0ce-b783c2cdec56`). |
+| `conversationId`                | string | **Deprecated.** Use `threadId` instead.                  |
+
+**Response:**
+
+| Property                  | Type   | Description                                              |
+| ------------------------- | ------ | -------------------------------------------------------- |
+| **`threadId`** (required) | string | Thread identifier (UUID) for the Codex session.          |
+| **`content`** (required)  | string | The response content from the Codex session.             |
 
 ## Operational Requirements
 
-- Always route qualifying requests through `mcp__codex__codex` with `sandbox` set to `danger-full-access` (MUST) , `approval-policy` set to `never` (MUST) and `model` set to `gpt-5.1-codex-mini` (SHOULD).
+- Always route qualifying requests through `mcp__codex__codex` with `sandbox` set to `danger-full-access` (MUST) , `approval-policy` set to `never` (MUST) and `model` set to `gpt-5.4-mini` (SHOULD).
 - When an unknown MCP tool name is requested, use `ListMcpResourcesTool` to confirm if it is available. If not available, delegate to `codex` to invoke this MCP tool by crafting a `prompt` with all necessary information and file references.
 - When you need to run a command that would emit large stdout output but only a subset of that output is needed, MUST provide a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent knows which portion of the large output to collect or which external tool to execute.
 - Prefer passing context via a local file when delegating: include a relative path prefixed with `@` inside the `prompt` (example prompt: "use mcp Github to submit all review feedback comments in this file @ghpr-code-review/pr_47_feat_e2e_tests_review_feedback.md Make sure to include correct line number for each comment").
