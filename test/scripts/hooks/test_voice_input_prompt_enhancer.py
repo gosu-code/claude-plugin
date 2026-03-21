@@ -113,6 +113,8 @@ class TestShouldEnhancePrompt(unittest.TestCase):
             ("Add TO THIS DIRECTORY", "case insensitive - to this directory"),
             ("Update the authentication module.", "ends with dot"),
             ("Add new feature for users.", "ends with dot"),
+            ("What does this function do?", "ends with question mark"),
+            ("Can you help me fix this bug?", "ends with question mark"),
         ]
 
         for prompt, description in test_cases:

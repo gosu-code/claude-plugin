@@ -76,6 +76,7 @@ TRIGGER_PATTERNS = [
     re.compile(r"\bin this directory\b", re.IGNORECASE),
     re.compile(r"\bto this directory\b", re.IGNORECASE),
     re.compile(r"\.$"),  # Prompt ends with a dot, Claude /voice mode always do this.
+    re.compile(r"\?$"),  # Prompt ends with a question mark, Claude /voice mode always do this.
 ]
 
 
