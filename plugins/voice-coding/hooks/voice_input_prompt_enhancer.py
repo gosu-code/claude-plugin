@@ -69,12 +69,13 @@ ELLIPSIS_PATTERNS = [
     re.compile(r"\band so forth\b", re.IGNORECASE),
 ]
 
-# Trigger patterns - detect file/directory reference triggers (unique patterns not covered above)
+# Trigger patterns - unique patterns not covered above. e.g: file/directory reference
 TRIGGER_PATTERNS = [
     re.compile(r"\bin this file\b", re.IGNORECASE),
     re.compile(r"\bto this file\b", re.IGNORECASE),
     re.compile(r"\bin this directory\b", re.IGNORECASE),
     re.compile(r"\bto this directory\b", re.IGNORECASE),
+    re.compile(r"\.$"),  # Prompt ends with a dot, Claude /voice mode always do this.
 ]
 
 
@@ -130,7 +131,7 @@ def should_enhance_prompt(prompt: str) -> bool:
     - PLACEHOLDER_PATTERNS: [placeholder], <placeholder>, etc.
     - NAMEHOLDER_PATTERNS: [nameholder], "nameholder", etc.
     - ELLIPSIS_PATTERNS: ..., etc, and so on, etc.
-    - TRIGGER_PATTERNS: in this file, to this directory, etc.
+    - TRIGGER_PATTERNS: in this file, to this directory, ends with dot, etc.
     """
     # Check all pattern lists for matches
     all_patterns = (
@@ -348,7 +349,10 @@ def generate_prompt_enhancing_instructions(
 
     # Check if prompt is a long one (possibly from voice input)
     if len(prompt) > MIN_LONG_PROMPT_LENGTH:
-        instruction += "\nNote: The prompt may be a long transcripts of user voice input using Speech To Text. Identify the main intent and ignore misspellings, out of context or filler words."
+        instruction += "\nNote: The prompt is a long transcripts of user voice input by the Speech-to-Text engine. Must focus on identify the main intent, keywords and ignore misspellings/out-of-context/filler words."
+    else:  # short prompt scenario
+        instruction += "\nNote: The prompt may contain words misinterpreted by the Speech-to-Text engine. Use the conversation context and working directory to infer correct interpretations (e.g., similar-sounding words, technical terms, file/directory names, proper nouns)."
+
     return instruction
 
 
@@ -380,7 +384,7 @@ def main() -> None:
 
         # Get project context and generate prompt enhancing instructions
         project_context = get_project_context(cwd)
-        file_instructions = generate_prompt_enhancing_instructions(
+        additional_instructions = generate_prompt_enhancing_instructions(
             prompt, project_context
         )
 
@@ -388,7 +392,7 @@ def main() -> None:
         output = {
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
-                "additionalContext": file_instructions,
+                "additionalContext": additional_instructions,
             }
         }
 

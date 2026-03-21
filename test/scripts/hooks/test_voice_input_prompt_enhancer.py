@@ -111,6 +111,8 @@ class TestShouldEnhancePrompt(unittest.TestCase):
             ("Copy files to this directory", "to this directory"),
             ("Update IN THIS FILE", "case insensitive - in this file"),
             ("Add TO THIS DIRECTORY", "case insensitive - to this directory"),
+            ("Update the authentication module.", "ends with dot"),
+            ("Add new feature for users.", "ends with dot"),
         ]
 
         for prompt, description in test_cases:
@@ -123,7 +125,7 @@ class TestShouldEnhancePrompt(unittest.TestCase):
     def test_non_triggering_prompts(self):
         """Test that normal prompts do NOT trigger enhancement."""
         test_cases = [
-            ("Update the authentication module", "Normal prompt"),
+            ("Update the authentication module", "Normal prompt without dot"),
             ("Add new feature for users", "No triggers"),
             ("Refactor the code", "Simple request"),
             ("Implement user login", "Feature request"),
@@ -335,11 +337,12 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
         long_prompt = "Update placeholder " + "x" * MIN_LONG_PROMPT_LENGTH
         instructions = generate_prompt_enhancing_instructions(long_prompt, context)
 
-        self.assertIn("Speech To Text", instructions)
-        self.assertIn("voice input", instructions.lower())
+        self.assertIn("Speech-to-Text", instructions)
+        self.assertIn("main intent", instructions.lower())
+        self.assertIn("misspellings", instructions.lower())
 
-    def test_short_prompt_no_note(self):
-        """Test that short prompts don't get voice input note."""
+    def test_short_prompt_note(self):
+        """Test that short prompts get Speech-to-Text misinterpretation note."""
         context = {
             "project_files": [],
             "common_dirs": [],
@@ -349,7 +352,9 @@ class TestGenerateFileFindingInstructions(unittest.TestCase):
         short_prompt = "Update placeholder"
         instructions = generate_prompt_enhancing_instructions(short_prompt, context)
 
-        self.assertNotIn("Speech To Text", instructions)
+        self.assertIn("Speech-to-Text", instructions)
+        self.assertIn("misinterpreted", instructions.lower())
+        self.assertIn("conversation context", instructions.lower())
 
     def test_keyword_category_test_matching(self):
         """Test that 'test' keyword triggers test directory suggestion."""
