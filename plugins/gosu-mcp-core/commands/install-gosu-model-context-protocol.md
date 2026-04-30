@@ -1,19 +1,21 @@
 ---
-allowed-tools: Bash(gh auth:*), Bash(claude mcp:*), Bash(docker run:*)
+allowed-tools: Bash(gh auth:*), Bash(claude mcp:*), Bash(uname:*), Bash(test:*), Bash(mkdir:*), Bash(cp:*), Bash(chmod:*), Bash(ls:*), Bash(unzip:*), Bash(rm:*)
 argument-hint: [--help|--update]
 description: Install and configure the Gosu MCP server
 model: claude-haiku-4-5
 ---
-Install and configure the gosu MCP server using GitHub CLI authentication. Usage: `/install-gosu-model-context-protocol`
+Install and configure the gosu MCP server using the bundled native binaries and GitHub CLI authentication. Usage: `/install-gosu-model-context-protocol`
 User prompt: $ARGUMENTS
 When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructions and stop. Do not proceed further.
 
 1.  **COMMAND Arguments Analysis**:
-  - When `--update` is present, skip Phase 1 and Phase 2 entirely and immediately execute Phase 3.
-  - When no arguments are provided, execute all three phases in order so Phase 3 runs after a successful installation/verification.
+  - When `--update` is present, treat the command as a reinstall/refresh of the Gosu MCP server binary and Claude MCP registration.
+  - When no arguments are provided, execute the full install and verification flow.
 
 2.  **COMMAND Execution Process**:
-  - Inspect $ARGUMENTS before starting the workflow. If the arguments contain `--update`, assume the MCP server is already installed and jump directly to Phase 3; otherwise continue with the normal phased flow below.
+  - Use the Claude plugin installation directory `~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core` as the source of truth for bundled install assets.
+  - The expected bundled archive path is `~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip`.
+  - The installed server path must be `~/.gosu/gosu-mcp-server`.
 
   **Phase 1: Verify GH Status**
   - Verify if user has already authenticated to GitHub CLI by running `gh auth status`
@@ -28,36 +30,49 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     - Token: gho_*********************************
     ```
   
-  **Phase 2: Install MCP Server**
-  - Execute the MCP server installation command: `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN -v '${PWD:-.}:/server/cwd' 0xgosu/gosu-mcp-server`
-  - Capture the command output and analyze the response
-  - Check if the output contains one of the following success messages:
-    - "MCP server gosu already exists in local config" (server already installed)
-    - "Added stdio MCP server gosu with command: docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN 0xgosu/gosu-mcp-server to local config" (new installation successful)
-  - If either success message is found, verify with a follow-up command: `claude mcp list` to confirm "gosu" is listed among installed MCP servers
-    - A message "gosu: docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN 0xgosu/gosu-mcp-server - ✓ Connected" confirms successful connection
-    - If "gosu" is listed with a failed status, try to run the docker command manually to diagnose connection issues: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN $(gh auth token) -v $PWD:/server/cwd' 0xgosu/gosu-mcp-server`
-    - Try remove "-v '${PWD:-.}:/server/cwd'" from the docker command if volume mounting issues are suspected
-    - Show any error messages from the manual run to help user troubleshoot
-  - When a successful MCP connection is confirmed, 
-    - Display a final success message to the user: "Gosu MCP server installed and configured successfully. Please /exit and start `claude` again for changes to take effect."
-    - Proceed to Phase 3 to ensure the docker image is current before stopping execution
-  - If neither success message is present, or any errors occur during installation, analyze the error output to provide potential resolution steps based on common error patterns
-    - Must display the full error message to help user troubleshoot
-    - Show suggestions to resolve common issues, such as:
-      - "Ensure Docker is installed and running"
-      - "Check your internet connection"
-      - "Verify your GitHub token has necessary permissions"
+  **Phase 2: Install Native Binary**
+  - Verify that the plugin directory exists: `test -d ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core`
+  - Verify that the bundled archive exists: `test -f ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip`
+  - If either path is missing, stop and explain that the gosu-mcp-core plugin installation is incomplete and should be reinstalled.
+  - Detect the user platform:
+    - Run `uname -s` and map `Darwin` -> `darwin`, `Linux` -> `linux`
+    - Run `uname -m` and map `x86_64` or `amd64` -> `amd64`, `arm64` or `aarch64` -> `arm64`
+    - If the OS or architecture is unsupported, stop and report the detected values
+  - Ensure the target directory exists: `mkdir -p ~/.gosu`
+  - Create a temporary extraction directory inside `~/.gosu`, such as `~/.gosu/tmp-gosu-mcp-server-install`
+  - Remove any previous temporary extraction directory before reusing it: `rm -rf ~/.gosu/tmp-gosu-mcp-server-install`
+  - Unzip the bundled archive into that directory: `unzip -o ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip -d ~/.gosu/tmp-gosu-mcp-server-install`
+  - Select the binary matching the detected platform from this extracted layout:
+    - `gosu-mcp-server-native-binaries/gosu-mcp-server-darwin-amd64`
+    - `gosu-mcp-server-native-binaries/gosu-mcp-server-darwin-arm64`
+    - `gosu-mcp-server-native-binaries/gosu-mcp-server-linux-amd64`
+    - `gosu-mcp-server-native-binaries/gosu-mcp-server-linux-arm64`
+  - Copy the selected binary to `~/.gosu/gosu-mcp-server`
+  - Apply executable permissions: `chmod +x ~/.gosu/gosu-mcp-server`
+  - Verify the installed binary exists and is executable with `test -x ~/.gosu/gosu-mcp-server`
+  - Remove the temporary extraction directory after a successful copy
+  - If unzip, copy, or chmod fails, display the exact error output and stop
 
-  **Phase 3: Update Docker Image**
-  - Run `docker pull 0xgosu/gosu-mcp-server` to fetch the latest Gosu MCP server image
-  - Treat both "Downloaded newer image" and "Image is up to date" outputs as success
-  - On success, display a confirmation message: "Gosu MCP docker image updated. Please /exit and start `claude` again for changes to take effect."
-  - If the pull fails, report the exact docker error and provide troubleshooting steps (e.g., "Verify Docker is running", "Check network connectivity", "Confirm you have access to docker.io repositories")
-  - When the command was invoked with `--update`, this phase is the only action taken; stop execution after reporting the result
+  **Phase 3: Configure Claude MCP**
+  - Execute the MCP registration command: `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- ~/.gosu/gosu-mcp-server stdio`
+  - Capture the command output and analyze the response
+  - Treat both of these as success:
+    - A new server registration message for `gosu`
+    - "MCP server gosu already exists in local config"
+  - After a successful add/update attempt, verify with `claude mcp list` to confirm `gosu` is listed among installed MCP servers
+    - A healthy entry should reference `~/.gosu/gosu-mcp-server stdio` and show a connected status
+    - If `gosu` is listed with a failed status, report the failure output and remind the user to confirm the binary at `~/.gosu/gosu-mcp-server` is executable
+  - When a successful MCP connection is confirmed:
+    - Display: "Gosu MCP server installed and configured successfully. Please /exit and start `claude` again for changes to take effect."
+  - If `claude mcp add` fails, display the full error message and provide focused troubleshooting suggestions:
+    - "Verify `gh auth login` has completed successfully"
+    - "Confirm `~/.gosu/gosu-mcp-server` exists and is executable"
+    - "Re-run `/install-gosu-model-context-protocol --update` to refresh the installed binary"
 
 3.  **COMMAND Output Directory**:
-  - This command does not produce output files. All configuration is handled by the Claude MCP system.
+  - This command installs the Gosu MCP server binary to `~/.gosu/gosu-mcp-server`
+  - It uses the bundled archive from `~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip`
+  - No additional project files are produced
 
 4.  **Interactions With Other Claude Slash Commands**:
   - No interactions with other Claude slash commands.
