@@ -38,7 +38,7 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     - Run `uname -s` and map `Darwin` -> `darwin`, `Linux` -> `linux`
     - Run `uname -m` and map `x86_64` or `amd64` -> `amd64`, `arm64` or `aarch64` -> `arm64`
     - If the OS or architecture is unsupported, stop and report the detected values
-  - Ensure the target directory exists: `mkdir -p ~/.gosu`
+  - Ensure `~/.gosu` exists before cleanup or unzip: `mkdir -p ~/.gosu`
   - Check if the extraction directory `~/.gosu/gosu-mcp-server-native-binaries` already exists. If it does, remove it first: `rm -rf ~/.gosu/gosu-mcp-server-native-binaries`
   - Unzip the bundled archive directly into `~/.gosu`: `unzip -o ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip -d ~/.gosu`
   - Select the binary matching the detected platform from this extracted layout:
