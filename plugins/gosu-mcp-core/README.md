@@ -36,10 +36,11 @@ The gosu-mcp-core plugin extends Claude Code with specialized AI agents, powerfu
 
 ## Prerequisites
 
-- **Docker**: Required for running the MCP server container
+- **Native gosu MCP binaries**: Bundled with the plugin and installed by the MCP setup command
 - **GitHub CLI (`gh`)**: Required for GitHub authentication (`gh auth login`)
 - **Python 3.x**: Required for skill scripts
 - **Bash**: Required for shell scripts
+- **unzip**: Required to extract the bundled native binaries during installation
 
 ## Components
 
@@ -266,7 +267,7 @@ python3 scripts/create_git_worktree.py "implement feature" \
 
 #### install-gosu-model-context-protocol
 
-Installs and configures the Gosu MCP server using GitHub CLI authentication and Docker.
+Installs and configures the Gosu MCP server using bundled native binaries and GitHub CLI authentication.
 
 **Usage:**
 ```
@@ -275,14 +276,14 @@ Installs and configures the Gosu MCP server using GitHub CLI authentication and 
 
 **Process:**
 1. Verifies GitHub CLI authentication status
-2. Installs MCP server via Docker
-3. Configures Claude Code integration
-4. Verifies successful connection
+2. Detects the local OS and CPU architecture
+3. Installs the matching native binary to `~/.gosu/gosu-mcp-server`
+4. Configures Claude Code integration
+5. Verifies successful connection
 
 **Requirements:**
-- Docker installed and running
 - GitHub CLI authenticated (`gh auth login`)
-- Active internet connection
+- `unzip` installed
 
 ### Hooks
 
