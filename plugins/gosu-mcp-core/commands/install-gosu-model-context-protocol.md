@@ -55,9 +55,11 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
   **Phase 3: Configure Claude MCP**
   - Execute the MCP registration command: `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- ~/.gosu/gosu-mcp-server stdio`
   - Capture the command output and analyze the response
-  - Treat both of these as success:
-    - A new server registration message for `gosu`
-    - "MCP server gosu already exists in local config"
+  - If the output says "MCP server gosu already exists in local config", do not treat that as success yet
+    - Remove the existing user-scoped entry with `claude mcp remove gosu --scope user`
+    - Then run the same `claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) -- ~/.gosu/gosu-mcp-server stdio` command again
+    - If removal or the second add fails, display the full error output and stop
+  - Treat only a successful add or re-add as success
   - After a successful add/update attempt, verify with `claude mcp list` to confirm `gosu` is listed among installed MCP servers
     - A healthy entry should reference `~/.gosu/gosu-mcp-server stdio` and show a connected status
     - If `gosu` is listed with a failed status, report the failure output and remind the user to confirm the binary at `~/.gosu/gosu-mcp-server` is executable
