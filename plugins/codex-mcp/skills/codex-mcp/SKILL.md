@@ -21,7 +21,7 @@ Run a Codex session. Accepts configuration parameters matching the Codex Config 
 | `config`                | object | Path to individual config settings toml file that override `$CODEX_HOME/config.toml` (see [codex-config-toml-structure.md](references/codex-config-toml-structure.md) to understand how to create this file).                 |
 | `cwd`                   | string | Working directory for the session. Relative paths resolve from the server process root.                                                                |
 | `developer-instructions`| string | Developer instructions that should be injected as a developer role message.                                                                            |
-| `model`                 | string | Optional override for the model name (e.g., `gpt-5.4-mini`, `gpt-5.4`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.2-codex`) default is `gpt-5.4`.                                                                                       |
+| `model`                 | string | Optional override for the model name (e.g., `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.4`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.2-codex`) default is `gpt-5.4`.                                                                                       |
 | `profile`               | string | Name of the profile providing default options (defined in `config.toml`).                                                                                           |
 | `sandbox`               | string | Sandbox mode: `read-only`, `workspace-write`, or `danger-full-access`.                                                                                 |
 
@@ -56,6 +56,27 @@ Continue a Codex session by providing the conversation id and follow-up prompt. 
 - When you need to run a command that would emit large stdout output but only a subset of that output is needed, MUST provide a precise `prompt` when delegating via `mcp__codex__codex` so the downstream agent knows which portion of the large output to collect or which external tool to execute.
 - Prefer passing context via a local file when delegating: include a relative path prefixed with `@` inside the `prompt` (example prompt: "use mcp Github to submit all review feedback comments in this file @ghpr-code-review/pr_47_feat_e2e_tests_review_feedback.md Make sure to include correct line number for each comment").
 - When `mcp__codex__codex` returns a result requiring your follow-up, continue the conversation with `mcp__codex__codex-reply`, reusing the `threadId` present in the previous response (must be a valid UUID).
+
+## Image Generation
+
+When the user requests to generate an image, delegate to `mcp__codex__codex` using `model` set to `gpt-5.5` (REQUIRED for image generation). The downstream Codex agent must:
+
+- Copy the generated image file to the current working directory (`cwd`).
+- Return the **absolute path** of the copied image file in the response.
+
+When crafting the `prompt`, include explicit instructions such as:
+
+> "Generate an image of `{description}`. Copy the output image to the current working directory and respond with the absolute path of the copied image file."
+
+Example delegation parameters:
+
+- `model`: `gpt-5.5`
+- `cwd`: the user's current working directory (absolute path)
+- `sandbox`: `danger-full-access`
+- `approval-policy`: `never`
+- `prompt`: e.g. `"Generate a PNG image of a red origami fox sitting on a stack of books in a cozy library, soft warm lighting, shallow depth of field. Copy the output to the current working directory, and respond with ONLY the absolute path of the copied image file (no extra commentary)."`
+
+After receiving the response, surface the absolute path of the generated image to the user.
 
 ## Known MCP Server Tools
 

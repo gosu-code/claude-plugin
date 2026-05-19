@@ -16,10 +16,6 @@
     {
       "name": "voice-coding",
       "source": "./plugins/voice-coding"
-    },
-    {
-      "name": "gdd",
-      "source": "./plugins/goal-driven-development"
     }
   ]
 }
