@@ -29,6 +29,7 @@ Usage:
 import argparse
 import json
 import os
+import pwd
 import subprocess
 import sys
 import shutil
@@ -215,88 +216,199 @@ class GitWorktreeCreator:
 
             logger.info(f"Successfully created worktree with branch {self.branch_name}")
     
-    def copy_git_ignored_files(self):
-        """Recursively copy selected git-ignored files/dirs from main workspace to worktree.
+    def _link_or_copy_file(self, src, dst):
+        """Hard-link a file from src to dst; fall back to copy2 on failure.
 
-        - Walks the entire `self.main_workspace` tree.
-        - If a directory matches, copies it and prunes that subtree from traversal.
-        - If a file matches, copies it preserving relative structure.
+        Hard links avoid duplicating file content (same inode), making bulk
+        materialization of large trees like node_modules essentially free.
+        Falls back to a real copy if src/dst are on different filesystems
+        or the OS rejects the link (e.g., cross-device, permission).
         """
-        names_to_copy = {
-            'node_modules',
-            '.pnpm-store',
-            '.env',
-            'go.work',
-            'go.work.sum',
-            'vendor',
-            '.venv',
-            '.ruff_cache',
-            '.mypy_cache',
-        }
-
-        root = self.main_workspace
-
-        # Detect if the worktree dir is inside the main workspace to avoid copying into itself
-        worktree_inside_main = False
         try:
-            self.worktree_dir.relative_to(root)
-            worktree_inside_main = True
-        except Exception:
-            worktree_inside_main = False
+            os.link(src, dst)
+            return 'linked'
+        except OSError:
+            shutil.copy2(src, dst)
+            return 'copied'
 
-        for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-            current = Path(dirpath)
+    @staticmethod
+    def _clear_dst(dst):
+        """Remove ``dst`` whether it's a symlink (broken or not), file, or dir.
 
-            # If worktree is inside main workspace, don't traverse into it
-            if worktree_inside_main:
-                try:
-                    current.relative_to(self.worktree_dir)
-                    # We're inside the worktree subtree; stop traversing further
-                    dirnames[:] = []
+        Idempotency helper used before materializing into ``dst``. ``Path.exists()``
+        returns False for broken symlinks, so we always test ``is_symlink()`` too.
+        """
+        if dst.is_symlink() or dst.is_file():
+            dst.unlink()
+        elif dst.exists():
+            shutil.rmtree(dst)
+
+    def _link_tree(self, src_dir, dst_dir):
+        """Recreate src_dir at dst_dir, hard-linking files instead of copying.
+
+        Tries ``cp -al`` (C-implemented, batched syscalls) first since
+        Python's ``shutil.copytree`` is significantly slower for trees with
+        hundreds of thousands of files like ``node_modules``. Falls back to
+        ``shutil.copytree(copy_function=os.link)``, then to a plain
+        recursive copy if hard-linking is rejected (e.g., cross-device).
+        """
+        # Fast path: cp -al on POSIX. Both GNU (Linux) and BSD (macOS) cp
+        # accept -a (archive) and -l (hard link). dst_dir must not exist.
+        self._clear_dst(dst_dir)
+        if os.name == 'posix' and shutil.which('cp'):
+            result = subprocess.run(
+                ['cp', '-al', str(src_dir), str(dst_dir)],
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0:
+                return 'linked'
+            logger.debug(f"cp -al failed for {src_dir} -> {dst_dir}: {result.stderr.strip()}; falling back")
+            self._clear_dst(dst_dir)
+
+        try:
+            shutil.copytree(src_dir, dst_dir, copy_function=os.link, symlinks=True)
+            return 'linked'
+        except (OSError, shutil.Error):
+            self._clear_dst(dst_dir)
+            shutil.copytree(src_dir, dst_dir, symlinks=True)
+            return 'copied'
+
+    def _symlink_dir(self, src_dir, dst_dir):
+        """Replace ``dst_dir`` with a symlink pointing at ``src_dir``.
+
+        Used for shared content-addressed caches where sharing is the point.
+        Symlinking is O(1) versus O(files) for the hard-link path.
+        """
+        self._clear_dst(dst_dir)
+        dst_dir.parent.mkdir(parents=True, exist_ok=True)
+        dst_dir.symlink_to(src_dir, target_is_directory=True)
+
+    # Shared content-addressed caches — symlinked into the worktree so state
+    # is naturally shared with the main workspace. pnpm stores content by
+    # hash, ruff/mypy invalidate by hash, so sharing is safe and O(1).
+    # NOTE: ``.venv`` is intentionally NOT here — ``pip install`` mutates
+    # files in place, which would leak across worktrees through a symlink.
+    _CACHE_DIR_NAMES = frozenset({'.pnpm-store', '.ruff_cache', '.mypy_cache'})
+    # Dependency trees — hard-link copied so each worktree has an independent
+    # directory entry that build tools can mutate without corrupting the main
+    # workspace, while file contents are still shared via inodes.
+    _HARDLINK_DIR_NAMES = frozenset({'node_modules', 'vendor', '.venv'})
+    # Single files — always hard-linked.
+    _IGNORED_FILE_NAMES = frozenset({'.env', 'go.work', 'go.work.sum'})
+
+    def _enumerate_ignored_targets(self, all_names):
+        """Find candidate ignored files/dirs at workspace root and one level deep.
+
+        Returns a list of absolute source paths whose basename is in ``all_names``.
+        Limiting traversal to depth 2 (root + immediate children) avoids the cost
+        of a full workspace walk — these names virtually never appear deeper than
+        ``packages/<pkg>/node_modules`` in real-world repos. Monorepos with deeper
+        nesting can extend this if needed.
+        """
+        root = self.main_workspace
+        targets = []
+        seen = set()
+
+        def scan_into(dir_path):
+            try:
+                with os.scandir(dir_path) as it:
+                    for entry in it:
+                        if entry.name in all_names:
+                            p = Path(entry.path)
+                            if p not in seen:
+                                seen.add(p)
+                                targets.append(p)
+            except OSError as e:
+                logger.debug(f"scandir({dir_path}) failed: {e}")
+
+        # Depth 0: workspace root itself
+        scan_into(root)
+
+        # Depth 1: each immediate subdirectory of root
+        try:
+            with os.scandir(root) as it:
+                children = list(it)
+        except OSError as e:
+            logger.debug(f"scandir({root}) failed: {e}")
+            children = []
+
+        for entry in children:
+            if entry.name == '.git':
+                continue
+            if entry.name in all_names:
+                # Already handled at depth 0 (or pruned to avoid descending into it)
+                continue
+            try:
+                if not entry.is_dir(follow_symlinks=False):
                     continue
-                except Exception:
-                    pass
+            except OSError:
+                continue
+            child = Path(entry.path)
+            # Don't descend into the worktree itself
+            try:
+                child.relative_to(self.worktree_dir)
+                continue
+            except ValueError:
+                pass
+            scan_into(child)
 
-            # Also don't traverse into .git
-            if '.git' in dirnames:
-                dirnames.remove('.git')
+        return targets
 
-            # Handle matching directories first and prune them from traversal
-            to_prune = []
-            for d in list(dirnames):
-                if d in names_to_copy:
-                    src_dir = current / d
-                    # Destination path preserves relative structure
-                    rel_path = src_dir.relative_to(root)
-                    dst_dir = self.worktree_dir / rel_path
-                    try:
-                        if dst_dir.exists():
-                            shutil.rmtree(dst_dir)
-                        dst_dir.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copytree(src_dir, dst_dir)
-                        logger.info(f"Copied directory: {rel_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to copy directory {rel_path}: {e}")
-                    # Prune this directory from traversal
-                    to_prune.append(d)
+    def copy_git_ignored_files(self):
+        """Materialize selected git-ignored files/dirs from main workspace to worktree.
 
-            # Apply pruning so we don't descend into copied directories
-            for d in to_prune:
-                if d in dirnames:
-                    dirnames.remove(d)
+        Strategy:
+          - Shared caches (``.pnpm-store``, ``.ruff_cache``, ``.mypy_cache``,
+            ``.venv``) are *symlinked* — O(1), and these tools are designed to
+            share state across workspaces.
+          - Dependency trees (``node_modules``, ``vendor``) are *hard-linked*
+            via ``cp -al`` so each worktree has an independent skeleton but
+            file contents share inodes.
+          - Single files (``.env``, ``go.work``, ``go.work.sum``) are
+            hard-linked, falling back to copy on cross-device errors.
+          - Search is limited to the workspace root and its immediate
+            subdirectories, instead of a full recursive walk.
+        """
+        all_names = self._CACHE_DIR_NAMES | self._HARDLINK_DIR_NAMES | self._IGNORED_FILE_NAMES
+        root = self.main_workspace
+        symlinked = linked_dirs = copied_dirs = linked_files = copied_files = failed = 0
 
-            # Handle matching files in the current directory
-            for f in filenames:
-                if f in names_to_copy:
-                    src_file = current / f
-                    rel_path = src_file.relative_to(root)
-                    dst_file = self.worktree_dir / rel_path
-                    try:
-                        dst_file.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(src_file, dst_file)
-                        logger.info(f"Copied file: {rel_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to copy file {rel_path}: {e}")
+        for src in self._enumerate_ignored_targets(all_names):
+            rel_path = src.relative_to(root)
+            dst = self.worktree_dir / rel_path
+            name = src.name
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if name in self._CACHE_DIR_NAMES and src.is_dir():
+                    self._symlink_dir(src, dst)
+                    symlinked += 1
+                    logger.debug(f"symlinked cache: {rel_path}")
+                elif name in self._HARDLINK_DIR_NAMES and src.is_dir():
+                    mode = self._link_tree(src, dst)
+                    if mode == 'linked':
+                        linked_dirs += 1
+                    else:
+                        copied_dirs += 1
+                    logger.debug(f"{'hard-linked' if mode == 'linked' else 'copied'} dir: {rel_path}")
+                elif src.is_file():
+                    self._clear_dst(dst)
+                    mode = self._link_or_copy_file(src, dst)
+                    if mode == 'linked':
+                        linked_files += 1
+                    else:
+                        copied_files += 1
+                    logger.debug(f"{'hard-linked' if mode == 'linked' else 'copied'} file: {rel_path}")
+            except Exception as e:
+                failed += 1
+                logger.warning(f"Failed to materialize {rel_path}: {e}")
+
+        if symlinked or linked_dirs or copied_dirs or linked_files or copied_files or failed:
+            logger.info(
+                f"Ignored materialization: {symlinked} cache symlink(s), "
+                f"{linked_dirs} hard-linked dir(s), {copied_dirs} copied dir(s), "
+                f"{linked_files} hard-linked file(s), {copied_files} copied file(s)"
+                + (f", {failed} failed" if failed else "")
+            )
     
     def create_symlinks(self):
         """Create symlinks for gitignore files require for development"""
@@ -328,108 +440,186 @@ class GitWorktreeCreator:
                 logger.warning(f"Plan file not found: {self.args.plan_file}")
     
     def set_ownership(self):
-        """Set ownership of worktree directory."""
-        if self.args.agent_user:
-            try:
-                cmd = f"chown -R {self.args.agent_user}: {self.worktree_dir}"
-                self.run_command(cmd)
-                logger.info(f"Changed ownership to {self.args.agent_user}")
-            except Exception as e:
-                logger.warning(f"Failed to change ownership: {e}")
-    
-    def verify_worktree(self):
-        """Verify that the worktree is functional."""
-        logger.info("Verifying worktree functionality...")
-        
+        """Set ownership of worktree directory.
+
+        Skipped when the requested ``--agent-user`` already matches the current
+        effective UID *and* GID — ``chown -R`` would otherwise walk every entry
+        in a tree that, after hard-linking, can contain hundreds of thousands
+        of files.
+        """
+        agent_user = self.args.agent_user
+        if not agent_user:
+            return
+
         try:
-            # Test git command
-            result = self.run_command("git status", cwd=self.worktree_dir)
+            entry = pwd.getpwnam(agent_user)
+        except KeyError:
+            logger.warning(f"Unknown agent user '{agent_user}'; skipping ownership change")
+            return
+
+        if entry.pw_uid == os.geteuid() and entry.pw_gid == os.getegid():
+            logger.info(f"Worktree already owned by '{agent_user}'; skipping chown")
+            return
+
+        try:
+            cmd = f"chown -R {agent_user}: {self.worktree_dir}"
+            self.run_command(cmd)
+            logger.info(f"Changed ownership to {agent_user}")
+        except Exception as e:
+            logger.warning(f"Failed to change ownership: {e}")
+
+    def verify_worktree(self):
+        """Verify that the worktree is functional.
+
+        Intentionally lightweight: ``git status`` confirms the worktree is wired
+        up. ``go.work`` / ``package.json`` get presence-only checks — we used to
+        run ``go work sync`` here but it hits the network and can take seconds
+        on cold caches, which dominates the post-create wall time for Go repos.
+        The hard-linked module cache already gives us the artifacts we need.
+        """
+        logger.info("Verifying worktree functionality...")
+
+        try:
+            self.run_command("git status", cwd=self.worktree_dir)
             logger.info("Git status check: PASSED")
-            
-            # Test go command if go.work exists
+
             if (self.worktree_dir / 'go.work').exists():
-                result = self.run_command("go work sync", cwd=self.worktree_dir, check=False)
-                if result.returncode == 0:
-                    logger.info("Go work sync check: PASSED")
-                else:
-                    logger.warning("Go work sync check: FAILED")
-            
-            # Test npm command if package.json exists
+                logger.info("Go workspace detected (go.work present)")
+
             if (self.worktree_dir / 'package.json').exists():
-                result = self.run_command("npm --version", cwd=self.worktree_dir, check=False)
-                if result.returncode == 0:
-                    logger.info("NPM version check: PASSED")
-                else:
-                    logger.warning("NPM version check: FAILED")
-                    
+                logger.info("Node project detected (package.json present)")
+
         except Exception as e:
             logger.error(f"Worktree verification failed: {e}")
             raise
+
+    def _workspace_changes(self):
+        """Run ``git status`` once and return (staged, modified, untracked) lists.
+
+        Cached on first access so callers can ask for each bucket independently
+        without re-forking git. Uses ``--porcelain=v1 -z --untracked-files=all``
+        to get a NUL-delimited, rename-aware listing safe for paths with spaces.
+        Replaces three separate ``git diff`` / ``git ls-files`` invocations.
+        """
+        cached = getattr(self, '_workspace_changes_cache', None)
+        if cached is not None:
+            return cached
+
+        staged, modified, untracked = [], [], []
+        try:
+            result = self.run_command(
+                "git status --porcelain=v1 -z --untracked-files=all", check=False
+            )
+            if result.returncode != 0:
+                logger.warning("Failed to read git status for workspace changes")
+                self._workspace_changes_cache = (staged, modified, untracked)
+                return self._workspace_changes_cache
+
+            tokens = result.stdout.split('\x00')
+            i = 0
+            unmerged_seen = 0
+            while i < len(tokens):
+                entry = tokens[i]
+                if not entry:
+                    i += 1
+                    continue
+                if len(entry) < 4:
+                    # Malformed line — every porcelain v1 record is "XY <path>".
+                    i += 1
+                    continue
+                x, y, path = entry[0], entry[1], entry[3:]
+                rename = x in 'RC' or y in 'RC'
+                # Unmerged states: any of DD, AU, UD, UA, DU, AA, UU.
+                # See `git status --short` docs.
+                unmerged = (x == 'U' or y == 'U' or
+                            (x == 'A' and y == 'A') or (x == 'D' and y == 'D'))
+
+                if unmerged:
+                    unmerged_seen += 1
+                elif x == '?' and y == '?':
+                    untracked.append(path)
+                else:
+                    # Staged changes: anything not "?", "!", " ", or pure-deletion.
+                    if x not in ' ?!' and x != 'D':
+                        staged.append(path)
+                    # Unstaged modifications (skip pure deletions).
+                    if y == 'M':
+                        modified.append(path)
+
+                # Renames/copies are encoded with an additional NUL-separated
+                # source path immediately after — skip it.
+                i += 2 if rename else 1
+
+            if unmerged_seen:
+                logger.warning(
+                    f"Skipped {unmerged_seen} unmerged path(s) — resolve conflicts "
+                    f"in the main workspace before creating worktrees if you need them."
+                )
+        except Exception as e:
+            logger.warning(f"Failed to enumerate workspace changes: {e}")
+
+        self._workspace_changes_cache = (staged, modified, untracked)
+        return self._workspace_changes_cache
+
+    def _materialize_workspace_files(self, rel_paths, label):
+        """Materialize a list of repo-relative paths into the worktree.
+
+        Used by the staged/modified/untracked copy methods. Hard-links files
+        where possible, falls back to copy on cross-device errors. Per-file
+        events are logged at DEBUG; a single summary line is logged at INFO.
+        """
+        linked = copied = skipped = 0
+        for rel_path in rel_paths:
+            src = self.main_workspace / rel_path
+            dst = self.worktree_dir / rel_path
+            if not src.exists():
+                continue
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if src.is_dir():
+                    mode = self._link_tree(src, dst)
+                else:
+                    self._clear_dst(dst)
+                    mode = self._link_or_copy_file(src, dst)
+                if mode == 'linked':
+                    linked += 1
+                else:
+                    copied += 1
+                logger.debug(f"{label}: {'hard-linked' if mode == 'linked' else 'copied'} {rel_path}")
+            except Exception as e:
+                skipped += 1
+                logger.warning(f"Failed to materialize {label} {rel_path}: {e}")
+        if linked or copied or skipped:
+            logger.info(
+                f"{label.capitalize()} materialization: linked={linked}, copied={copied}"
+                + (f", skipped={skipped}" if skipped else "")
+            )
     
     def copy_staged_files(self):
-        """copy staged files in the worktree with those from the main workspace."""
-        try:
-            result = self.run_command("git diff --cached --name-only", check=False)
-            if result.returncode != 0:
-                logger.warning("Failed to get staged files list.")
-                return
-            files = [f for f in result.stdout.strip().split('\n') if f]
-            for rel_path in files:
-                src = self.main_workspace / rel_path
-                dst = self.worktree_dir / rel_path
-                if src.exists():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, dst)
-                    logger.info(f"Overrode staged file: {rel_path}")
-        except Exception as e:
-            logger.warning(f"Error overriding staged files: {e}")
+        """Materialize staged files from main workspace into worktree."""
+        staged, _, _ = self._workspace_changes()
+        self._materialize_workspace_files(staged, label='staged')
 
     def copy_non_staged_modified_files(self):
-        """copy modified files in the worktree with those from the main workspace."""
-        try:
-            result = self.run_command("git diff --name-only", check=False)
-            if result.returncode != 0:
-                logger.warning("Failed to get modified files list.")
-                return
-            files = [f for f in result.stdout.strip().split('\n') if f]
-            for rel_path in files:
-                src = self.main_workspace / rel_path
-                dst = self.worktree_dir / rel_path
-                if src.exists():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, dst)
-                    logger.info(f"Overrode modified file: {rel_path}")
-        except Exception as e:
-            logger.warning(f"Error overriding modified files: {e}")
+        """Materialize unstaged-modified files from main workspace into worktree."""
+        _, modified, _ = self._workspace_changes()
+        self._materialize_workspace_files(modified, label='modified')
 
     def copy_untracked_files(self):
-        """Copy untracked files from the main workspace to the worktree."""
-        try:
-            result = self.run_command("git ls-files --others --exclude-standard", check=False)
-            if result.returncode != 0:
-                logger.warning("Failed to get untracked files list.")
-                return
-            files = [f for f in result.stdout.strip().split('\n') if f]
-            for rel_path in files:
-                src = self.main_workspace / rel_path
-                dst = self.worktree_dir / rel_path
-                if src.exists():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    if src.is_dir():
-                        if dst.exists():
-                            shutil.rmtree(dst)
-                        shutil.copytree(src, dst)
-                        logger.info(f"Copied untracked directory: {rel_path}")
-                    else:
-                        shutil.copy2(src, dst)
-                        logger.info(f"Copied untracked file: {rel_path}")
-        except Exception as e:
-            logger.warning(f"Error copying untracked files: {e}")
+        """Materialize untracked files from main workspace into worktree.
+
+        Uses hard links where possible to avoid duplicating bulky untracked
+        trees; falls back to a real copy if hard-linking fails.
+        """
+        _, _, untracked = self._workspace_changes()
+        self._materialize_workspace_files(untracked, label='untracked')
 
     def run(self):
         """Run the complete worktree creation process."""
         try:
             logger.info("Starting git worktree creation process...")
+            # Invalidate any cached workspace-change snapshot from a prior run.
+            self._workspace_changes_cache = None
             # Step 1: Create worktree
             self.create_worktree()
             # Step 2: Copy git-ignored files

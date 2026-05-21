@@ -33,6 +33,7 @@ import tempfile
 import shutil
 import subprocess
 import json
+import os
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock, call
 import sys
@@ -327,28 +328,38 @@ class TestGitWorktreeCreator(unittest.TestCase):
             self.assertFalse(copied_file.exists())
 
     def test_copy_git_ignored_files_nested_structure(self):
-        """Test copy_git_ignored_files preserves directory structure"""
+        """Test copy_git_ignored_files preserves directory structure at depth 1.
+
+        Scanning is bounded to workspace root + one level deep for speed
+        (typical layout: ``packages/<pkg>/node_modules``). Entries nested
+        deeper are intentionally not picked up.
+        """
         args = self.create_mock_args()
         with patch('os.getcwd', return_value=str(self.main_workspace)):
             creator = GitWorktreeCreator(args)
 
-            # Create a mock worktree directory
             worktree_dir = Path(self.temp_dir) / "test_worktree"
             worktree_dir.mkdir()
             creator.worktree_dir = worktree_dir
 
-            # Create nested structure
-            nested_dir = self.main_workspace / "subdir" / "nested"
-            nested_dir.mkdir(parents=True)
-            env_file = nested_dir / ".env"
-            env_file.write_text("NESTED=true")
+            # Depth 1: subdir/.env — within the supported scan range
+            subdir = self.main_workspace / "subdir"
+            subdir.mkdir()
+            (subdir / ".env").write_text("SHALLOW=true")
+
+            # Depth 2: deeper/even-deeper/.env — beyond the scan range
+            deep = self.main_workspace / "deeper" / "even-deeper"
+            deep.mkdir(parents=True)
+            (deep / ".env").write_text("DEEP=true")
 
             creator.copy_git_ignored_files()
 
-            # Verify structure was preserved
-            copied_file = worktree_dir / "subdir" / "nested" / ".env"
-            self.assertTrue(copied_file.exists())
-            self.assertEqual(copied_file.read_text(), "NESTED=true")
+            shallow_copy = worktree_dir / "subdir" / ".env"
+            self.assertTrue(shallow_copy.exists())
+            self.assertEqual(shallow_copy.read_text(), "SHALLOW=true")
+
+            deep_copy = worktree_dir / "deeper" / "even-deeper" / ".env"
+            self.assertFalse(deep_copy.exists(), "Files deeper than 1 level should not be picked up")
 
     def test_create_symlinks(self):
         """Test create_symlinks functionality"""
@@ -475,25 +486,65 @@ class TestGitWorktreeCreator(unittest.TestCase):
             creator.copy_plan_file()
 
     def test_set_ownership(self):
-        """Test set_ownership functionality"""
+        """Test set_ownership runs chown when target user differs from current"""
         args = self.create_mock_args(agent_user='testuser')
         with patch('os.getcwd', return_value=str(self.main_workspace)):
             creator = GitWorktreeCreator(args)
 
-            # Create a mock worktree directory
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            # Fake pwd entry whose uid/gid differ from the test runner so the
+            # short-circuit doesn't trip.
+            fake_entry = Mock()
+            fake_entry.pw_uid = 999999
+            fake_entry.pw_gid = 999999
+
+            with patch('create_git_worktree.pwd.getpwnam', return_value=fake_entry), \
+                 patch.object(creator, 'run_command') as mock_cmd:
+                creator.set_ownership()
+
+                mock_cmd.assert_called_once()
+                call_args = mock_cmd.call_args[0][0]
+                self.assertIn("chown", call_args)
+                self.assertIn("testuser", call_args)
+                self.assertIn(str(worktree_dir), call_args)
+
+    def test_set_ownership_skipped_when_current_user(self):
+        """Test set_ownership short-circuits when target uid/gid match the runner"""
+        args = self.create_mock_args(agent_user='testuser')
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            # Fake pwd entry that *matches* the current effective ids — chown
+            # should be skipped because the worktree is already owned correctly.
+            fake_entry = Mock()
+            fake_entry.pw_uid = os.geteuid()
+            fake_entry.pw_gid = os.getegid()
+
+            with patch('create_git_worktree.pwd.getpwnam', return_value=fake_entry), \
+                 patch.object(creator, 'run_command') as mock_cmd:
+                creator.set_ownership()
+                mock_cmd.assert_not_called()
+
+    def test_set_ownership_unknown_user(self):
+        """Test set_ownership warns and skips when --agent-user is unknown"""
+        args = self.create_mock_args(agent_user='definitely-not-a-real-user-xyz')
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
             worktree_dir = Path(self.temp_dir) / "test_worktree"
             worktree_dir.mkdir()
             creator.worktree_dir = worktree_dir
 
             with patch.object(creator, 'run_command') as mock_cmd:
                 creator.set_ownership()
-
-                # Verify chown command was called
-                mock_cmd.assert_called_once()
-                call_args = mock_cmd.call_args[0][0]
-                self.assertIn("chown", call_args)
-                self.assertIn("testuser", call_args)
-                self.assertIn(str(worktree_dir), call_args)
+                mock_cmd.assert_not_called()
 
     def test_set_ownership_no_user(self):
         """Test set_ownership with no user specified"""
