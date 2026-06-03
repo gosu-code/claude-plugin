@@ -38,18 +38,20 @@ When $ARGUMENTS contains `--help`, `-h`, or `--usage`, print the usage instructi
     - Run `uname -s` and map `Darwin` -> `darwin`, `Linux` -> `linux`
     - Run `uname -m` and map `x86_64` or `amd64` -> `amd64`, `arm64` or `aarch64` -> `arm64`
     - If the OS or architecture is unsupported, stop and report the detected values
-  - Ensure `~/.gosu` exists before cleanup or unzip: `mkdir -p ~/.gosu`
-  - Check if the extraction directory `~/.gosu/gosu-mcp-server-native-binaries` already exists. If it does, remove it first: `rm -rf ~/.gosu/gosu-mcp-server-native-binaries`
-  - Unzip the bundled archive directly into `~/.gosu`: `unzip -o ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip -d ~/.gosu`
-  - Select the binary matching the detected platform from this extracted layout:
-    - `gosu-mcp-server-native-binaries/gosu-mcp-server-darwin-amd64`
-    - `gosu-mcp-server-native-binaries/gosu-mcp-server-darwin-arm64`
-    - `gosu-mcp-server-native-binaries/gosu-mcp-server-linux-amd64`
-    - `gosu-mcp-server-native-binaries/gosu-mcp-server-linux-arm64`
+  - Ensure `~/.gosu` exists before unzip: `mkdir -p ~/.gosu`
+  - Unzip the bundled archive flattening paths into `~/.gosu`: `unzip -o -j ~/.claude/plugins/marketplaces/gosu-code/plugins/gosu-mcp-core/artifacts/gosu-mcp-server-native-binaries.zip -d ~/.gosu`
+  - Select the binary matching the detected platform directly from `~/.gosu`:
+    - `~/.gosu/gosu-mcp-server-darwin-amd64`
+    - `~/.gosu/gosu-mcp-server-darwin-arm64`
+    - `~/.gosu/gosu-mcp-server-linux-amd64`
+    - `~/.gosu/gosu-mcp-server-linux-arm64`
   - Copy the selected binary to `~/.gosu/gosu-mcp-server`
   - Apply executable permissions: `chmod +x ~/.gosu/gosu-mcp-server`
+  - If the detected platform is `darwin` (MacOS), remove quarantine and ad-hoc sign the binary to allow it to run:
+    - Run: `xattr -d com.apple.quarantine ~/.gosu/gosu-mcp-server` (ignore errors if xattr is missing or fails)
+    - Run: `codesign --force --deep --sign - ~/.gosu/gosu-mcp-server`
   - Verify the installed binary exists and is executable with `test -x ~/.gosu/gosu-mcp-server`
-  - Remove `~/.gosu/gosu-mcp-server-native-binaries` after a successful copy
+  - Clean up the unneeded platform-specific binaries: `rm -f ~/.gosu/gosu-mcp-server-darwin-amd64 ~/.gosu/gosu-mcp-server-darwin-arm64 ~/.gosu/gosu-mcp-server-linux-amd64 ~/.gosu/gosu-mcp-server-linux-arm64`
   - If unzip, copy, or chmod fails, display the exact error output and stop
 
   **Phase 3: Configure Claude MCP**

@@ -398,6 +398,17 @@ npm list       # for Node.js projects
 3. Restart Claude Code
 4. Try manual run: `GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) ~/.gosu/gosu-mcp-server stdio`
 
+### MacOS Security Restrictions
+
+**Problem:** MacOS blocks the server from running due to quarantine or codesign issues ("killed" error)
+
+**Solutions:**
+Run the following commands to ensure the binary is allowed to run on Mac:
+```bash
+xattr -d com.apple.quarantine ~/.gosu/gosu-mcp-server
+codesign --force --deep --sign - ~/.gosu/gosu-mcp-server
+```
+
 ### Agent Not Activating
 
 **Problem:** Specialized agents don't respond to requests

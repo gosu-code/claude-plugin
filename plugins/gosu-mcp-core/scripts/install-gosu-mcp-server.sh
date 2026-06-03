@@ -58,21 +58,17 @@ echo "Detected platform: ${PLATFORM_OS}-${PLATFORM_ARCH}. Selecting binary: $BIN
 # Ensure ~/.gosu exists
 mkdir -p ~/.gosu
 
-# Remove existing extraction directory if it exists
-rm -rf ~/.gosu/gosu-mcp-server-native-binaries
-
 echo "Extracting archive..."
-unzip -q -o "$ZIP_FILE" -d ~/.gosu
+unzip -q -o -j "$ZIP_FILE" -d ~/.gosu
 
 # Check if the required binary was extracted
-if [ ! -f ~/.gosu/gosu-mcp-server-native-binaries/"$BINARY_NAME" ]; then
+if [ ! -f ~/.gosu/"$BINARY_NAME" ]; then
     echo -e "${RED}Error: Required binary $BINARY_NAME not found in the extracted archive.${NC}"
-    rm -rf ~/.gosu/gosu-mcp-server-native-binaries
     exit 1
 fi
 
 echo "Installing binary..."
-cp ~/.gosu/gosu-mcp-server-native-binaries/"$BINARY_NAME" ~/.gosu/gosu-mcp-server
+cp ~/.gosu/"$BINARY_NAME" ~/.gosu/gosu-mcp-server
 chmod +x ~/.gosu/gosu-mcp-server
 
 # Verify the installed binary is executable
@@ -81,8 +77,8 @@ if [ ! -x ~/.gosu/gosu-mcp-server ]; then
     exit 1
 fi
 
-# Clean up extraction directory
-rm -rf ~/.gosu/gosu-mcp-server-native-binaries
+# Clean up the extracted platform-specific binaries
+rm -f ~/.gosu/gosu-mcp-server-darwin-amd64 ~/.gosu/gosu-mcp-server-darwin-arm64 ~/.gosu/gosu-mcp-server-linux-amd64 ~/.gosu/gosu-mcp-server-linux-arm64
 echo -e "${GREEN}Binary installed successfully to ~/.gosu/gosu-mcp-server.${NC}"
 
 # Phase 3: Configure Claude MCP
