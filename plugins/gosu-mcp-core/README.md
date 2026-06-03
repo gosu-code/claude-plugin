@@ -393,11 +393,10 @@ npm list       # for Node.js projects
 **Problem:** MCP server not connecting after installation
 
 **Solutions:**
-1. Verify Docker is running: `docker ps`
-2. Check GitHub authentication: `gh auth status`
-3. Verify MCP server status: `claude mcp list`
-4. Restart Claude Code
-5. Try manual Docker run: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) 0xgosu/gosu-mcp-server`
+1. Check GitHub authentication: `gh auth status`
+2. Verify MCP server status: `claude mcp list`
+3. Restart Claude Code
+4. Try manual run: `GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) ~/.gosu/gosu-mcp-server stdio`
 
 ### Agent Not Activating
 

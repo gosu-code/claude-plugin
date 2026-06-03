@@ -38,14 +38,20 @@ Optional plugins:
 
 ### 3. Configure MCP Server (gosu-mcp-core only)
 
-After installing `gosu-mcp-core`, restart Claude Code, then run:
+After installing `gosu-mcp-core`, reload plugins, then run install MCP slash command:
 
 ```
+/reload-plugins
 /gosu-mcp-core:install-gosu-model-context-protocol
 ```
 
+Alternatively, you can install the MCP directly by running this bash command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gosu-code/claude-plugin/main/plugins/gosu-mcp-core/scripts/install-gosu-mcp-server.sh | bash
+```
+
 **Prerequisites for MCP server installation:**
-- Docker installed and running
 - GitHub CLI (`gh`) installed and authenticated (`gh auth login`)
 
 ## Plugins
@@ -160,10 +166,7 @@ Common issues and solutions:
 - Run `gh auth login` to authenticate with GitHub CLI
 - Verify authentication with `gh auth status`
 
-**Docker connection errors**
-- Ensure Docker is installed and running
-- Test Docker: `docker run hello-world`
-- Check Docker daemon status
+
 
 **Permission errors**
 - Verify your GitHub token has necessary scopes
