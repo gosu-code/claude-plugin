@@ -12,13 +12,17 @@ NC='\033[0m'
 echo -e "${YELLOW}Starting Gosu MCP Server Automated Installation...${NC}"
 
 # Phase 1: Verify GH Status
-if ! gh auth status &>/dev/null; then
-    echo -e "${RED}Error: You must authenticate with GitHub CLI first before installing this mcp server.${NC}"
-    echo -e "${RED}Please run: gh auth login or ensure GITHUB_TOKEN is set appropriately for gh cli in your headless environment.${NC}"
+if [ -z "$GH_TOKEN" ] && ! gh auth status &>/dev/null; then
+    echo -e "${RED}Error: You must authenticate with GitHub CLI first or set GH_TOKEN environment variable before installing this mcp server.${NC}"
+    echo -e "${RED}Please run: gh auth login${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}GitHub CLI authentication verified.${NC}"
+if [ -n "$GH_TOKEN" ]; then
+    echo -e "${GREEN}GitHub token provided via GH_TOKEN environment variable.${NC}"
+else
+    echo -e "${GREEN}GitHub CLI authentication verified.${NC}"
+fi
 
 # Phase 2: Install Native Binary
 TEMP_DIR=$(mktemp -d)
@@ -85,25 +89,28 @@ echo -e "${GREEN}Binary installed successfully to ~/.gosu/gosu-mcp-server.${NC}"
 echo "Configuring Claude MCP..."
 
 # Get GitHub token
-GH_TOKEN=$(gh auth token)
 if [ -z "$GH_TOKEN" ]; then
-    echo -e "${RED}Error: Could not retrieve GitHub token using 'gh auth token'.${NC}"
+    GH_TOKEN=$(gh auth token 2>/dev/null || true)
+fi
+
+if [ -z "$GH_TOKEN" ]; then
+    echo -e "${RED}Error: Could not retrieve GitHub token. Set GH_TOKEN environment variable or run 'gh auth login'.${NC}"
     exit 1
 fi
 
 # We use set +e temporarily because 'claude mcp add' might return a non-zero exit code if it already exists or fails
 set +e
-ADD_OUTPUT=$(claude mcp add gosu --scope project --env GITHUB_PERSONAL_ACCESS_TOKEN="$GH_TOKEN" -- ~/.gosu/gosu-mcp-server stdio 2>&1)
+ADD_OUTPUT=$(claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN="$GH_TOKEN" -- ~/.gosu/gosu-mcp-server stdio 2>&1)
 ADD_STATUS=$?
 set -e
 
 # If it says it already exists, remove and re-add
 if echo "$ADD_OUTPUT" | grep -q "already exists"; then
     echo "Existing Gosu MCP configuration found. Updating..."
-    claude mcp remove gosu --scope project &>/dev/null || true
+    claude mcp remove gosu --scope user &>/dev/null || true
     
     set +e
-    ADD_OUTPUT=$(claude mcp add gosu --scope project --env GITHUB_PERSONAL_ACCESS_TOKEN="$GH_TOKEN" -- ~/.gosu/gosu-mcp-server stdio 2>&1)
+    ADD_OUTPUT=$(claude mcp add gosu --scope user --env GITHUB_PERSONAL_ACCESS_TOKEN="$GH_TOKEN" -- ~/.gosu/gosu-mcp-server stdio 2>&1)
     ADD_STATUS=$?
     set -e
 fi
