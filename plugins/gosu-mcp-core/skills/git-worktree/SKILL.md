@@ -24,7 +24,7 @@ This skill provides tools for creating and managing Git worktrees, handling both
 ## Usage
 
 ```bash
-python3 scripts/create_git_worktree.py [prompt words ...] [--branch BRANCH | --worktree WORKTREE_DIR] [--plan-file FILE] [--agent-user USER] [--no-copy-staged] [--copy-modified] [--copy-untracked] [--worktree-parent-dir DIR] [--verbose]
+python3 scripts/create_git_worktree.py [prompt words ...] [--branch BRANCH | --worktree WORKTREE_DIR] [--agent-user USER] [--no-copy-staged] [--copy-modified] [--copy-untracked] [--worktree-parent-dir DIR] [--verbose]
 ```
 
 ### Main Arguments
@@ -33,7 +33,6 @@ python3 scripts/create_git_worktree.py [prompt words ...] [--branch BRANCH | --w
 - `--branch`: Branch name for new worktree (overrides prompt-based naming)
 - `--base-branch`: Base branch to create the new worktree from (local or remote). If not specified, worktree is created from current HEAD. Examples: `develop`, `origin/main`, `release-1.0`
 - `--worktree`: Use an _existing_ worktree directory path instead of creating a new one
-- `--plan-file`: Optional project/plan file to copy into the worktree
 - `--agent-user`: The OS user to set as owner of new worktree dir (for agent that run with a separate OS user)
 - `--no-copy-staged`: Prevents copying staged files into the new worktree (default = copy staged files)
 - `--copy-modified`: Also copy modified-but-not-staged files
@@ -45,7 +44,7 @@ python3 scripts/create_git_worktree.py [prompt words ...] [--branch BRANCH | --w
 
 ```bash
 # Create a new worktree with a branch name based on the prompt
-python3 scripts/create_git_worktree.py feature add user auth --plan-file path/to/plan.md --agent-user vscode --copy-untracked
+python3 scripts/create_git_worktree.py feature add user auth --agent-user vscode --copy-untracked
 
 # Create with explicit branch and copy all types of files
 python3 scripts/create_git_worktree.py --branch feat/apply-fixes --copy-modified --copy-untracked
@@ -57,7 +56,7 @@ python3 scripts/create_git_worktree.py implement new API --branch feature/new-ap
 python3 scripts/create_git_worktree.py hotfix critical bug --branch hotfix/security-patch --base-branch origin/release-1.0
 
 # Use an existing worktree dir created earlier
-python3 scripts/create_git_worktree.py "apply patch" --worktree /workspaces/worktree-agent-no1 --plan-file path/to/plan.md
+python3 scripts/create_git_worktree.py "apply patch" --worktree /workspaces/worktree-agent-no1
 
 ```
 

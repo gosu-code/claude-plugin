@@ -255,8 +255,7 @@ python3 scripts/create_git_worktree.py \
 
 # Create for agent workflow
 python3 scripts/create_git_worktree.py "apply fixes" \
-  --agent-user vscode \
-  --plan-file plan.md
+  --agent-user vscode
 
 # Use existing worktree directory
 python3 scripts/create_git_worktree.py "implement feature" \
@@ -376,8 +375,7 @@ done
 ```bash
 # Create isolated environment for new feature
 python3 scripts/create_git_worktree.py feature add payment integration \
-  --copy-untracked \
-  --plan-file payment-plan.md
+  --copy-untracked
 
 # Verify worktree setup
 cd ../worktree-agent-no1

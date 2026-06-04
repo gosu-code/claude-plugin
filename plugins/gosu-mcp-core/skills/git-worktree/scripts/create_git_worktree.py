@@ -22,8 +22,8 @@ Git Worktree Creation Script
 This script creates git worktrees with proper setup for development environments.
 It handles file copying, symlink creation, and ownership management.
 Usage:
-    python3 create_git_worktree.py clean up todos comment --branch branch_name --plan-file path/to/task-plan.md --agent-user vscode
-    python3 create_git_worktree.py refactor API errors --worktree /workspaces/worktree-agent-no1 --plan-file path/to/task-plan.md --agent-user vscode
+    python3 create_git_worktree.py clean up todos comment --branch branch_name --agent-user vscode
+    python3 create_git_worktree.py refactor API errors --worktree /workspaces/worktree-agent-no1 --agent-user vscode
 """
 
 import argparse
@@ -297,61 +297,54 @@ class GitWorktreeCreator:
     _IGNORED_FILE_NAMES = frozenset({'.env', 'go.work', 'go.work.sum'})
 
     def _enumerate_ignored_targets(self, all_names):
-        """Find candidate ignored files/dirs at workspace root and one level deep.
+        """Find candidate ignored files/dirs at workspace root and up to depth 5.
 
         Returns a list of absolute source paths whose basename is in ``all_names``.
-        Limiting traversal to depth 2 (root + immediate children) avoids the cost
-        of a full workspace walk — these names virtually never appear deeper than
-        ``packages/<pkg>/node_modules`` in real-world repos. Monorepos with deeper
-        nesting can extend this if needed.
+        Limiting traversal depth avoids the cost of a full workspace walk while 
+        supporting nested architectures like deep monorepos.
         """
         root = self.main_workspace
         targets = []
         seen = set()
 
-        def scan_into(dir_path):
+        def explore(current_dir, current_depth):
+            if current_depth > 5:
+                return
+
             try:
-                with os.scandir(dir_path) as it:
+                with os.scandir(current_dir) as it:
                     for entry in it:
+                        if entry.name == '.git':
+                            continue
+
+                        is_dir = False
+                        try:
+                            is_dir = entry.is_dir(follow_symlinks=False)
+                        except OSError:
+                            pass
+
                         if entry.name in all_names:
                             p = Path(entry.path)
                             if p not in seen:
                                 seen.add(p)
                                 targets.append(p)
+                            # Stop traversing deeper into matched targets
+                            continue
+
+                        if is_dir:
+                            child = Path(entry.path)
+                            # Don't descend into the worktree itself
+                            try:
+                                child.relative_to(self.worktree_dir)
+                                continue
+                            except ValueError:
+                                pass
+                            
+                            explore(child, current_depth + 1)
             except OSError as e:
-                logger.debug(f"scandir({dir_path}) failed: {e}")
+                logger.debug(f"scandir({current_dir}) failed: {e}")
 
-        # Depth 0: workspace root itself
-        scan_into(root)
-
-        # Depth 1: each immediate subdirectory of root
-        try:
-            with os.scandir(root) as it:
-                children = list(it)
-        except OSError as e:
-            logger.debug(f"scandir({root}) failed: {e}")
-            children = []
-
-        for entry in children:
-            if entry.name == '.git':
-                continue
-            if entry.name in all_names:
-                # Already handled at depth 0 (or pruned to avoid descending into it)
-                continue
-            try:
-                if not entry.is_dir(follow_symlinks=False):
-                    continue
-            except OSError:
-                continue
-            child = Path(entry.path)
-            # Don't descend into the worktree itself
-            try:
-                child.relative_to(self.worktree_dir)
-                continue
-            except ValueError:
-                pass
-            scan_into(child)
-
+        explore(root, 1)
         return targets
 
     def copy_git_ignored_files(self):
@@ -427,17 +420,6 @@ class GitWorktreeCreator:
                     settings_dst.unlink()
                 settings_dst.symlink_to(settings_src)
                 logger.info(f"Created symlink: {settings_dst} -> {settings_src}")
-    
-    def copy_plan_file(self):
-        """Copy plan file to worktree if specified."""
-        if self.args.plan_file:
-            plan_src = Path(self.args.plan_file)
-            if plan_src.exists():
-                plan_dst = self.worktree_dir / 'worktree-agent-task-plan.md'
-                shutil.copy2(plan_src, plan_dst)
-                logger.info(f"Copied plan file: {plan_dst.name}")
-            else:
-                logger.warning(f"Plan file not found: {self.args.plan_file}")
     
     def set_ownership(self):
         """Set ownership of worktree directory.
@@ -630,12 +612,10 @@ class GitWorktreeCreator:
                 self.copy_staged_files()
             if self.args.copy_modified:
                 self.copy_non_staged_modified_files()
-            # Step 4: Copy untracked file & plan file
+            # Step 4: Copy untracked file
             # Controlled by --copy-untracked
             if self.args.copy_untracked:
                 self.copy_untracked_files()
-            # Ensure plan file is available in the worktree if provided
-            self.copy_plan_file()
             # Step 5: Create symlinks for gitignore files require for dev
             try:
                 self.create_symlinks()
@@ -681,7 +661,6 @@ def run_as_claude_hook():
         branch=None,
         worktree=None,
         base_branch=None,
-        plan_file=None,
         agent_user=None,
         copy_staged=True,
         copy_modified=False,
@@ -714,7 +693,6 @@ def main():
     group.add_argument('--worktree', help='Existing worktree directory path')
     parser.add_argument('--base-branch',
                         help='Base branch to create worktree from (local or remote, e.g., develop, origin/develop)')
-    parser.add_argument('--plan-file', help='Path to task plan file')
     parser.add_argument('--agent-user', help='User to set as owner of worktree directory')
     parser.add_argument('--no-copy-staged', dest='copy_staged', action='store_false', help='Do not copy staged files in worktree')
     parser.set_defaults(copy_staged=True)
