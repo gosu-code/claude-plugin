@@ -117,6 +117,10 @@ def test_dangerous_git_patterns():
         "git clean -fX",  # Removes only ignored files
         "git push --force",
         "git push -f",
+        "git push origin main --force-with-lease",
+        "git push --force-with-lease origin master",
+        "git push origin develop --force-with-lease",
+        "git push production:production --force-with-lease",
         "git reflog expire --expire=now --all",
     ]
 
@@ -138,6 +142,8 @@ def test_safe_git_patterns():
         "git log",
         "git diff",
         "git clean -n",  # Dry-run, not dangerous
+        "git push origin feature --force-with-lease",
+        "git push --force-with-lease",
     ]
 
     print("\nTesting safe git commands that SHOULD NOT be blocked:")

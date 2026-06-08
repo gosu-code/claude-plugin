@@ -314,12 +314,14 @@ def is_dangerous_git_command(command):
         - git clean -f       # Removes untracked files
         - git clean -fd      # Removes untracked files and directories
         - git push --force   # Force pushes to remote
+        - git push origin main --force-with-lease # Blocked on protected branches
 
     Examples of allowed commands:
         - git status         # Safe read-only operation
         - git add .          # Stages changes
         - git commit -m ...  # Creates commit
         - git clean -n       # Dry-run (safe preview)
+        - git push origin feature --force-with-lease # Allowed on non-protected branches
 
     Args:
         command (str): The git command to analyze
@@ -328,6 +330,39 @@ def is_dangerous_git_command(command):
         bool: True if the command is dangerous and should be blocked, False otherwise
     """
     normalized = ' '.join(command.lower().split())
+    
+    # Handle git push logic explicitly to allow --force-with-lease on non-protected branches
+    if re.search(r'\bgit\b', normalized) and re.search(r'\bpush\b', normalized):
+        tokens = normalized.split()
+        for i, token in enumerate(tokens):
+            if token == 'push':
+                push_args = []
+                for arg in tokens[i+1:]:
+                    if arg in ('&&', ';', '|', '||'):
+                        break
+                    push_args.append(arg)
+                
+                has_force = False
+                has_force_with_lease = False
+                for arg in push_args:
+                    if arg == '--force' or arg == '-f':
+                        has_force = True
+                    elif arg.startswith('--force-with-lease'):
+                        has_force_with_lease = True
+                        
+                if has_force:
+                    return True
+                    
+                if has_force_with_lease:
+                    protected_branches = {'main', 'develop', 'master', 'production'}
+                    for arg in push_args:
+                        if arg in protected_branches:
+                            return True
+                        if ':' in arg:
+                            parts = arg.split(':')
+                            if len(parts) > 1 and parts[-1] in protected_branches:
+                                return True
+
     patterns = [
         r'git\s+reset\s+--hard',  # git reset --hard
         # git clean patterns - all variants with -f are destructive:
@@ -339,8 +374,6 @@ def is_dangerous_git_command(command):
         r'git\s+clean\s+-[a-z]*d[a-z]*f',  # git clean with d before f: -df, -dxf, -dfx, -xdf, etc.
         r'git\s+clean\s+-f[a-z]*(?:\s|$)',  # git clean -f/-fx/-fX: destructive even without -d
         r'git\s+reflog\s+expire\s+--expire=now\s+--all',  # git reflog expire --expire=now --all
-        r'git\s+push\s+--force',  # git push --force
-        r'git\s+push\s+-f',  # git push -f
         r'git\s+branch\s+-d\s+.*',  # git branch -d <branch>
         r'git\s+branch\s+-D\s+.*',  # git branch -D <branch>
         r'git\s+tag\s+-d\s+.*',  # git tag -d <tag>

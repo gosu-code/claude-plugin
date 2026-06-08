@@ -360,6 +360,13 @@ test_hook_decision \
     "Dangerous git command"
 
 test_hook_decision \
+    "git push --force-with-lease on protected branch" \
+    "Bash" \
+    '{"command": "git push origin main --force-with-lease"}' \
+    "deny" \
+    "Dangerous git command"
+
+test_hook_decision \
     "git branch -D" \
     "Bash" \
     '{"command": "git branch -D feature-branch"}' \
@@ -559,6 +566,14 @@ test_hook_decision \
     "git push (no force)" \
     "Bash" \
     '{"command": "git push origin main"}' \
+    "allow" \
+    "" \
+    "yes"
+
+test_hook_decision \
+    "git push --force-with-lease on non-protected branch" \
+    "Bash" \
+    '{"command": "git push origin feature-branch --force-with-lease"}' \
     "allow" \
     "" \
     "yes"
