@@ -389,18 +389,29 @@ def execute_hook_command(
         return "", f"Failed to execute hook command: {e}", 1
 
 
-def execute_json_hook(hook: Dict) -> Tuple[str, str, int]:
+def execute_json_hook(hook: Dict, hook_event_name: str) -> Tuple[str, str, int]:
     """
     Execute a JSON-type hook by returning a fixed JSON response.
 
     Args:
         hook: The hook configuration containing optional "json" and "exitcode" fields
+        hook_event_name: The name of the hook event (e.g., "Stop", "SubagentStop")
 
     Returns:
         Tuple of (json_output, stderr, exit_code)
     """
     # Get the JSON to return (default to empty object)
     json_output = hook.get("json", {})
+
+    # Transform legacy block format for Stop/SubagentStop
+    if hook_event_name in ("Stop", "SubagentStop") and isinstance(json_output, dict):
+        if json_output.get("decision") == "block" and "reason" in json_output:
+            json_output = {
+                "hookSpecificOutput": {
+                    "hookEventName": hook_event_name,
+                    "additionalContext": json_output["reason"]
+                }
+            }
 
     # Validate json_output is a dict or can be serialized
     if not isinstance(json_output, dict):
@@ -469,7 +480,7 @@ def main():
 
         if hook_type == "json":
             # Execute JSON hook - return fixed JSON response
-            stdout, stderr, exit_code = execute_json_hook(hook)
+            stdout, stderr, exit_code = execute_json_hook(hook, hook_event_name)
         else:
             # Execute command hook (default)
             command = hook.get("command", "")
@@ -486,6 +497,21 @@ def main():
             stdout, stderr, exit_code = execute_hook_command(
                 command, input_text, int(timeout)
             )
+
+            # Transform legacy block format for Stop/SubagentStop
+            if hook_event_name in ("Stop", "SubagentStop") and stdout.strip():
+                try:
+                    parsed_out = json.loads(stdout)
+                    if isinstance(parsed_out, dict) and parsed_out.get("decision") == "block" and "reason" in parsed_out:
+                        new_out = {
+                            "hookSpecificOutput": {
+                                "hookEventName": hook_event_name,
+                                "additionalContext": parsed_out["reason"]
+                            }
+                        }
+                        stdout = json.dumps(new_out)
+                except json.JSONDecodeError:
+                    pass
 
         # Output results
         if stdout:

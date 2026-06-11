@@ -7,8 +7,10 @@
           {
             "type": "json",
             "json": {
-              "decision": "block",
-              "reason": "Please run `make test` and ensure all tests pass before completing the task. If tests are not applicable, explain why."
+              "hookSpecificOutput": {
+                "hookEventName": "Stop",
+                "additionalContext": "Please run `make test` and ensure all tests pass before completing the task. If tests are not applicable, explain why."
+              }
             }
           }
         ]

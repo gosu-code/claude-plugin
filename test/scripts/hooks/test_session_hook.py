@@ -620,7 +620,7 @@ class TestExecuteJsonHook:
     def test_execute_json_hook_with_data(self):
         """Test executing a json hook with JSON data."""
         hook = {"type": "json", "json": {"key": "value", "nested": {"a": 1}}, "exitcode": 0}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 0
         assert stderr == ""
         parsed = json.loads(stdout)
@@ -629,7 +629,7 @@ class TestExecuteJsonHook:
     def test_execute_json_hook_empty_json(self):
         """Test executing a json hook with empty JSON (default)."""
         hook = {"type": "json"}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 0
         assert stderr == ""
         assert json.loads(stdout) == {}
@@ -637,21 +637,21 @@ class TestExecuteJsonHook:
     def test_execute_json_hook_custom_exitcode(self):
         """Test executing a json hook with custom exit code."""
         hook = {"type": "json", "json": {"status": "error"}, "exitcode": 42}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 42
         assert json.loads(stdout) == {"status": "error"}
 
     def test_execute_json_hook_zero_exitcode_explicit(self):
         """Test executing a json hook with explicit zero exit code."""
         hook = {"type": "json", "exitcode": 0}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 0
         assert json.loads(stdout) == {}
 
     def test_execute_json_hook_invalid_json_type(self):
         """Test that non-dict json field returns error."""
         hook = {"type": "json", "json": "not a dict"}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 1
         assert "must be an object" in stderr
         assert stdout == ""
@@ -659,14 +659,46 @@ class TestExecuteJsonHook:
     def test_execute_json_hook_string_exitcode(self):
         """Test that string exitcode is converted to int."""
         hook = {"type": "json", "exitcode": "5"}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 5
 
     def test_execute_json_hook_invalid_exitcode(self):
         """Test that invalid exitcode defaults to 0."""
         hook = {"type": "json", "exitcode": "not_a_number"}
-        stdout, stderr, exit_code = execute_json_hook(hook)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
         assert exit_code == 0
+
+    def test_execute_json_hook_legacy_stop_rewrite(self):
+        """Test that legacy decision: block JSON is rewritten for Stop/SubagentStop events."""
+        hook = {"type": "json", "json": {"decision": "block", "reason": "Please run tests"}}
+        
+        # Test with SessionStart (should not rewrite)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SessionStart")
+        assert exit_code == 0
+        parsed_normal = json.loads(stdout)
+        assert parsed_normal == {"decision": "block", "reason": "Please run tests"}
+        
+        # Test with Stop (should rewrite)
+        stdout, stderr, exit_code = execute_json_hook(hook, "Stop")
+        assert exit_code == 0
+        parsed_rewritten = json.loads(stdout)
+        assert parsed_rewritten == {
+            "hookSpecificOutput": {
+                "hookEventName": "Stop",
+                "additionalContext": "Please run tests"
+            }
+        }
+        
+        # Test with SubagentStop (should rewrite)
+        stdout, stderr, exit_code = execute_json_hook(hook, "SubagentStop")
+        assert exit_code == 0
+        parsed_subagent = json.loads(stdout)
+        assert parsed_subagent == {
+            "hookSpecificOutput": {
+                "hookEventName": "SubagentStop",
+                "additionalContext": "Please run tests"
+            }
+        }
 
 
 class TestMainIntegration:
