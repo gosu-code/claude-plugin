@@ -66,7 +66,10 @@ When the user requests to generate an image, delegate to `mcp__codex__codex` usi
 
 When crafting the `prompt`, include explicit instructions such as:
 
-> "Generate an image of `{description}`. Copy the output image to the current working directory and respond with the absolute path of the copied image file."
+> "Generate an image of `{description}`.
+> Must use built-in `image_gen` tool to generate image.
+> Read the imagegen system skill at ~/.codex/skills/.system/imagegen/SKILL.md to understand how to use the `image_gen` tool.
+> Copy the output image to the current working directory and respond with the absolute path of the copied image file."
 
 Example delegation parameters:
 
@@ -74,7 +77,7 @@ Example delegation parameters:
 - `cwd`: the user's current working directory (absolute path)
 - `sandbox`: `danger-full-access`
 - `approval-policy`: `never`
-- `prompt`: e.g. `"Generate a PNG image of a red origami fox sitting on a stack of books in a cozy library, soft warm lighting, shallow depth of field. Copy the output to the current working directory, and respond with ONLY the absolute path of the copied image file (no extra commentary)."`
+- `prompt`: e.g. `"Generate a PNG image of a red origami fox sitting on a stack of books in a cozy library, soft warm lighting, shallow depth of field. Must use built-in `image_gen` tool to generate image. Read the imagegen system skill at ~/.codex/skills/.system/imagegen/SKILL.md to understand how to use the `image_gen` tool. Copy the output to the current working directory, and respond with ONLY the absolute path of the copied image file (no extra commentary)."`
 
 After receiving the response, surface the absolute path of the generated image to the user.
 
