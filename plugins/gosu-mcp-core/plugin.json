@@ -1,0 +1,8 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "gosu-mcp-core",
+  "description": "Core plugin for Gosu MCP server installation and management",
+  "version": "1.0.38",
+  "author": "0xgosu@gmail.com",
+  "license": "AGPL3"
+}
