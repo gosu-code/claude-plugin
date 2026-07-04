@@ -81,6 +81,11 @@ python3 scripts/create_git_worktree.py "apply patch" --worktree /workspaces/work
 
 ## Notes
 - The new worktree directory will be created in the parent directory specified by `--worktree-parent-dir` (default: cwd's parent directory) and have the name "worktree-agent-no1" (or "worktree-agent-no2" and so on to avoid directory name conflicts)
-- The script will copied staged files and a known list of git ignored files and directories (e.g., node_modules, .env, .venv, vendor, etc.) to the worktree directory to help fast setup the worktree for development.
+- The script materializes staged files and a known list of git-ignored files and directories (e.g., node_modules, .env, .venv, vendor, etc.) into the worktree to help fast setup the worktree for development.
+- Dependency trees (`node_modules`, `.venv`, `vendor`) use the fastest available strategy, in order:
+  1. `clonefile(2)` on macOS/APFS — clones the whole tree copy-on-write in one syscall; worktree edits never leak back to the main workspace.
+  2. Per-package symlinks (e.g. Linux, where clone is unsupported) — each top-level package dir is symlinked to the main workspace (O(packages) instead of O(files)). Dot-entries like `.bin` and `.pnpm` are hard-linked instead, and `.cache` is skipped. Caveat: an in-place write inside a symlinked package (e.g. `pip uninstall` in `.venv`) reaches the main workspace — treat dep trees as read-mostly in the worktree.
+  3. `cp -al` hard links, then a plain copy as final fallbacks.
+- Shared tool caches (`.pnpm-store`, `.ruff_cache`, `.mypy_cache`) are symlinked to the main workspace.
 - Symlinks are created for certain dev-local secrets/settings to avoid copying them into the worktree directory.
 - Changing ownership requires appropriate system permissions.

@@ -27,6 +27,7 @@ Usage:
 """
 
 import argparse
+import ctypes
 import json
 import os
 import pwd
@@ -34,12 +35,48 @@ import subprocess
 import sys
 import shutil
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# libSystem handle for clonefile(2), resolved once at import (macOS only);
+# None means unavailable. Eager init avoids a benign-but-untidy double-load
+# race now that materialization runs on a thread pool.
+_LIBSYSTEM = None
+if sys.platform == 'darwin':
+    try:
+        _LIBSYSTEM = ctypes.CDLL('/usr/lib/libSystem.dylib', use_errno=True)
+        _LIBSYSTEM.clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint32]
+        _LIBSYSTEM.clonefile.restype = ctypes.c_int
+    except (OSError, AttributeError):
+        _LIBSYSTEM = None
+
+
+def _try_clonefile(src, dst):
+    """Clone ``src`` to ``dst`` with a single clonefile(2) syscall (macOS/APFS).
+
+    clonefile clones an entire directory hierarchy copy-on-write in one
+    syscall. The kernel still walks the tree, but the CoW clone is
+    dramatically cheaper than per-file link/copy from userspace. Unlike
+    hard links, the clone is fully independent — in-place writes in the
+    worktree never leak back to the main workspace.
+
+    Returns True on success, False when unavailable (non-darwin, non-APFS,
+    cross-volume, existing dst) so callers can fall through to slower
+    strategies. ``dst`` must not exist and its parent must exist.
+    """
+    if _LIBSYSTEM is None:
+        return False
+    ret = _LIBSYSTEM.clonefile(os.fsencode(str(src)), os.fsencode(str(dst)), 0)
+    if ret == 0:
+        return True
+    err = ctypes.get_errno()
+    logger.debug(f"clonefile({src} -> {dst}) failed: {os.strerror(err)}")
+    return False
 
 class GitWorktreeCreator:
     def __init__(self, args):
@@ -217,13 +254,15 @@ class GitWorktreeCreator:
             logger.info(f"Successfully created worktree with branch {self.branch_name}")
     
     def _link_or_copy_file(self, src, dst):
-        """Hard-link a file from src to dst; fall back to copy2 on failure.
+        """Clone or hard-link a file from src to dst; fall back to copy2.
 
-        Hard links avoid duplicating file content (same inode), making bulk
-        materialization of large trees like node_modules essentially free.
-        Falls back to a real copy if src/dst are on different filesystems
-        or the OS rejects the link (e.g., cross-device, permission).
+        Tries clonefile first on macOS (one CoW syscall, fully independent
+        copy), then a hard link (same inode, no content duplication), then a
+        real copy if src/dst are on different filesystems or the OS rejects
+        the link (e.g., cross-device, permission).
         """
+        if _try_clonefile(src, dst):
+            return 'cloned'
         try:
             os.link(src, dst)
             return 'linked'
@@ -243,18 +282,35 @@ class GitWorktreeCreator:
         elif dst.exists():
             shutil.rmtree(dst)
 
-    def _link_tree(self, src_dir, dst_dir):
-        """Recreate src_dir at dst_dir, hard-linking files instead of copying.
+    def _link_tree(self, src_dir, dst_dir, symlink_children_ok=False):
+        """Materialize src_dir at dst_dir via the fastest available strategy.
 
-        Tries ``cp -al`` (C-implemented, batched syscalls) first since
-        Python's ``shutil.copytree`` is significantly slower for trees with
-        hundreds of thousands of files like ``node_modules``. Falls back to
-        ``shutil.copytree(copy_function=os.link)``, then to a plain
-        recursive copy if hard-linking is rejected (e.g., cross-device).
+        Ladder:
+          1. clonefile — macOS/APFS clones the whole tree CoW in one syscall.
+          2. per-package symlinks (``symlink_children_ok`` only) — O(packages)
+             instead of O(files); see ``_symlink_children``.
+          3. ``cp -al`` — C-implemented hard-link farm, much faster than
+             Python's ``shutil.copytree`` for trees with hundreds of
+             thousands of files. Both GNU and BSD cp accept -a and -l.
+          4. ``shutil.copytree(copy_function=os.link)``.
+          5. plain recursive copy (e.g., cross-device where links fail).
+
+        ``symlink_children_ok`` must stay False for user code (staged /
+        modified / untracked trees): an in-place edit through a symlink
+        would mutate the main workspace. It is enabled only for dependency
+        trees, which worktree agents treat as read-mostly.
         """
-        # Fast path: cp -al on POSIX. Both GNU (Linux) and BSD (macOS) cp
-        # accept -a (archive) and -l (hard link). dst_dir must not exist.
         self._clear_dst(dst_dir)
+        if _try_clonefile(src_dir, dst_dir):
+            return 'cloned'
+
+        if symlink_children_ok:
+            try:
+                return self._symlink_children(src_dir, dst_dir)
+            except OSError as e:
+                logger.debug(f"symlink-children failed for {src_dir}: {e}; falling back")
+                self._clear_dst(dst_dir)
+
         if os.name == 'posix' and shutil.which('cp'):
             result = subprocess.run(
                 ['cp', '-al', str(src_dir), str(dst_dir)],
@@ -273,6 +329,65 @@ class GitWorktreeCreator:
             shutil.copytree(src_dir, dst_dir, symlinks=True)
             return 'copied'
 
+    # Dep-dir children that are never materialized into the worktree.
+    # ``.cache`` (webpack/babel/vite et al.) is large, regenerable, and the
+    # main write-through leak vector under the symlink strategy.
+    _SYMLINK_SKIP_CHILDREN = frozenset({'.cache'})
+
+    def _symlink_children(self, src_dir, dst_dir):
+        """Materialize dst_dir by symlinking each top-level child of src_dir.
+
+        O(packages) instead of O(files): a node_modules with 200k files but
+        2k top-level packages needs 2k symlinks rather than 200k hard links.
+        Used for dependency trees when clonefile is unavailable (e.g. Linux).
+
+        Node resolves modules through realpath by default, so a symlinked
+        package finds its own dependencies in the main workspace's complete
+        tree. Dot-entries (``.bin``, ``.pnpm``, lockfile metadata) are
+        hard-linked/copied instead of symlinked so tools that rewrite them
+        don't reach into the main workspace; ``.cache`` is skipped entirely.
+        Symlink entries (pnpm's top-level layout) are recreated verbatim so
+        relative targets keep resolving inside this worktree. A per-child
+        failure falls back to hard-link/copy and never aborts the dir.
+        """
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        with os.scandir(src_dir) as it:
+            entries = list(it)
+        failures = 0
+        for entry in entries:
+            name = entry.name
+            if name in self._SYMLINK_SKIP_CHILDREN:
+                continue
+            src = Path(entry.path)
+            dst = dst_dir / name
+            try:
+                self._clear_dst(dst)
+                if entry.is_symlink():
+                    dst.symlink_to(os.readlink(entry.path))
+                elif entry.is_dir(follow_symlinks=False):
+                    if name.startswith('.'):
+                        self._link_tree(src, dst)
+                    else:
+                        dst.symlink_to(src, target_is_directory=True)
+                else:
+                    self._link_or_copy_file(src, dst)
+            except OSError as e:
+                logger.debug(f"symlink-children entry {src} failed ({e}); falling back")
+                try:
+                    self._clear_dst(dst)
+                    if entry.is_dir(follow_symlinks=False):
+                        self._link_tree(src, dst)
+                    else:
+                        self._link_or_copy_file(src, dst)
+                except (OSError, shutil.Error) as e2:
+                    failures += 1
+                    logger.warning(f"Failed to materialize {src}: {e2}")
+        if failures:
+            logger.warning(
+                f"symlink-children: {failures} of {len(entries)} entries failed under {src_dir}"
+            )
+        return 'symlinked-children'
+
     def _symlink_dir(self, src_dir, dst_dir):
         """Replace ``dst_dir`` with a symlink pointing at ``src_dir``.
 
@@ -289,11 +404,14 @@ class GitWorktreeCreator:
     # NOTE: ``.venv`` is intentionally NOT here — ``pip install`` mutates
     # files in place, which would leak across worktrees through a symlink.
     _CACHE_DIR_NAMES = frozenset({'.pnpm-store', '.ruff_cache', '.mypy_cache'})
-    # Dependency trees — hard-link copied so each worktree has an independent
-    # directory entry that build tools can mutate without corrupting the main
-    # workspace, while file contents are still shared via inodes.
-    _HARDLINK_DIR_NAMES = frozenset({'node_modules', 'vendor', '.venv'})
-    # Single files — always hard-linked.
+    # Dependency trees — materialized via the ``_link_tree`` ladder with
+    # per-package symlinks enabled: clonefile (CoW, fully independent) →
+    # symlink-children → cp -al hard links → copy. Under the symlink tier
+    # (non-APFS hosts) an in-place write inside a package — e.g. ``pip
+    # uninstall`` in ``.venv`` — reaches the main workspace; dep trees are
+    # treated as read-mostly by worktree agents.
+    _DEP_DIR_NAMES = frozenset({'node_modules', 'vendor', '.venv'})
+    # Single files — cloned or hard-linked.
     _IGNORED_FILE_NAMES = frozenset({'.env', 'go.work', 'go.work.sum'})
 
     def _enumerate_ignored_targets(self, all_names):
@@ -347,59 +465,107 @@ class GitWorktreeCreator:
         explore(root, 1)
         return targets
 
+    def _tracked_targets(self, targets):
+        """Return the subset of ``targets`` that contain git-tracked content.
+
+        Target matching is name-based, so a *committed* ``vendor/`` (common
+        in Go repos) or ``go.work`` would otherwise be clobbered with the
+        main workspace's version — and, under the symlink tier, worktree
+        edits to those tracked files would write through to the main
+        workspace. Tracked targets are skipped: ``git worktree add`` already
+        checked out the branch's own copy. One batched ``git ls-files`` call
+        covers all targets.
+        """
+        if not targets:
+            return set()
+        rels = [str(t.relative_to(self.main_workspace)) for t in targets]
+        try:
+            result = subprocess.run(
+                ['git', 'ls-files', '-z', '--'] + rels,
+                cwd=self.main_workspace, capture_output=True, text=True,
+            )
+        except OSError as e:
+            logger.debug(f"git ls-files failed: {e}")
+            return set()
+        if result.returncode != 0:
+            logger.debug(f"git ls-files failed: {result.stderr.strip()}")
+            return set()
+        tracked = set()
+        for out_path in result.stdout.split('\x00'):
+            if not out_path:
+                continue
+            for target, rel in zip(targets, rels):
+                if out_path == rel or out_path.startswith(rel + '/'):
+                    tracked.add(target)
+        return tracked
+
+    def _materialize_ignored_target(self, src):
+        """Materialize one ignored file/dir into the worktree; returns mode string."""
+        rel_path = src.relative_to(self.main_workspace)
+        dst = self.worktree_dir / rel_path
+        name = src.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if name in self._CACHE_DIR_NAMES and src.is_dir():
+            self._symlink_dir(src, dst)
+            return 'cache-symlinked'
+        if name in self._DEP_DIR_NAMES and src.is_dir():
+            return self._link_tree(src, dst, symlink_children_ok=True)
+        if src.is_file():
+            self._clear_dst(dst)
+            return self._link_or_copy_file(src, dst)
+        return None
+
     def copy_git_ignored_files(self):
         """Materialize selected git-ignored files/dirs from main workspace to worktree.
 
         Strategy:
-          - Shared caches (``.pnpm-store``, ``.ruff_cache``, ``.mypy_cache``,
-            ``.venv``) are *symlinked* — O(1), and these tools are designed to
-            share state across workspaces.
-          - Dependency trees (``node_modules``, ``vendor``) are *hard-linked*
-            via ``cp -al`` so each worktree has an independent skeleton but
-            file contents share inodes.
-          - Single files (``.env``, ``go.work``, ``go.work.sum``) are
-            hard-linked, falling back to copy on cross-device errors.
-          - Search is limited to the workspace root and its immediate
-            subdirectories, instead of a full recursive walk.
+          - Shared caches (``.pnpm-store``, ``.ruff_cache``, ``.mypy_cache``)
+            are *symlinked* — O(1), and these tools are designed to share
+            state across workspaces.
+          - Dependency trees (``node_modules``, ``vendor``, ``.venv``) go
+            through the ``_link_tree`` ladder with per-package symlinks
+            enabled: clonefile → symlink-children → cp -al → copy.
+          - Single files (``.env``, ``go.work``, ``go.work.sum``) are cloned
+            or hard-linked, falling back to copy on cross-device errors.
+          - Targets are materialized concurrently: they are never nested in
+            one another (the enumeration walk stops at a match) and each
+            writes a distinct destination, so per-target work — dominated by
+            syscalls and ``cp`` subprocesses that release the GIL — can
+            overlap across a monorepo's many dep dirs.
         """
-        all_names = self._CACHE_DIR_NAMES | self._HARDLINK_DIR_NAMES | self._IGNORED_FILE_NAMES
-        root = self.main_workspace
-        symlinked = linked_dirs = copied_dirs = linked_files = copied_files = failed = 0
-
-        for src in self._enumerate_ignored_targets(all_names):
-            rel_path = src.relative_to(root)
-            dst = self.worktree_dir / rel_path
-            name = src.name
-            try:
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                if name in self._CACHE_DIR_NAMES and src.is_dir():
-                    self._symlink_dir(src, dst)
-                    symlinked += 1
-                    logger.debug(f"symlinked cache: {rel_path}")
-                elif name in self._HARDLINK_DIR_NAMES and src.is_dir():
-                    mode = self._link_tree(src, dst)
-                    if mode == 'linked':
-                        linked_dirs += 1
-                    else:
-                        copied_dirs += 1
-                    logger.debug(f"{'hard-linked' if mode == 'linked' else 'copied'} dir: {rel_path}")
-                elif src.is_file():
-                    self._clear_dst(dst)
-                    mode = self._link_or_copy_file(src, dst)
-                    if mode == 'linked':
-                        linked_files += 1
-                    else:
-                        copied_files += 1
-                    logger.debug(f"{'hard-linked' if mode == 'linked' else 'copied'} file: {rel_path}")
-            except Exception as e:
-                failed += 1
-                logger.warning(f"Failed to materialize {rel_path}: {e}")
-
-        if symlinked or linked_dirs or copied_dirs or linked_files or copied_files or failed:
+        all_names = self._CACHE_DIR_NAMES | self._DEP_DIR_NAMES | self._IGNORED_FILE_NAMES
+        targets = self._enumerate_ignored_targets(all_names)
+        tracked = self._tracked_targets(targets)
+        for target in tracked:
             logger.info(
-                f"Ignored materialization: {symlinked} cache symlink(s), "
-                f"{linked_dirs} hard-linked dir(s), {copied_dirs} copied dir(s), "
-                f"{linked_files} hard-linked file(s), {copied_files} copied file(s)"
+                f"Skipping {target.relative_to(self.main_workspace)}: "
+                f"tracked by git, the worktree checkout already provides it"
+            )
+        targets = [t for t in targets if t not in tracked]
+        if not targets:
+            return
+
+        counts = {}
+        failed = 0
+        max_workers = min(len(targets), os.cpu_count() or 4)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(self._materialize_ignored_target, src): src for src in targets}
+            for future in as_completed(futures):
+                src = futures[future]
+                rel_path = src.relative_to(self.main_workspace)
+                try:
+                    mode = future.result()
+                    if mode:
+                        counts[mode] = counts.get(mode, 0) + 1
+                        logger.debug(f"{mode}: {rel_path}")
+                except Exception as e:
+                    failed += 1
+                    logger.warning(f"Failed to materialize {rel_path}: {e}")
+
+        if counts or failed:
+            summary = ", ".join(f"{count} {mode}" for mode, count in sorted(counts.items()))
+            logger.info(
+                f"Ignored materialization: {summary}"
                 + (f", {failed} failed" if failed else "")
             )
     
@@ -546,11 +712,14 @@ class GitWorktreeCreator:
     def _materialize_workspace_files(self, rel_paths, label):
         """Materialize a list of repo-relative paths into the worktree.
 
-        Used by the staged/modified/untracked copy methods. Hard-links files
-        where possible, falls back to copy on cross-device errors. Per-file
-        events are logged at DEBUG; a single summary line is logged at INFO.
+        Used by the staged/modified/untracked copy methods. Clones or
+        hard-links files where possible, falls back to copy on cross-device
+        errors. Per-file events are logged at DEBUG; a single summary line is
+        logged at INFO. Never uses the symlink-children strategy — these are
+        user-code paths the agent will edit, and edits through a symlink
+        would mutate the main workspace.
         """
-        linked = copied = skipped = 0
+        cloned = linked = copied = skipped = 0
         for rel_path in rel_paths:
             src = self.main_workspace / rel_path
             dst = self.worktree_dir / rel_path
@@ -563,17 +732,19 @@ class GitWorktreeCreator:
                 else:
                     self._clear_dst(dst)
                     mode = self._link_or_copy_file(src, dst)
-                if mode == 'linked':
+                if mode == 'cloned':
+                    cloned += 1
+                elif mode == 'linked':
                     linked += 1
                 else:
                     copied += 1
-                logger.debug(f"{label}: {'hard-linked' if mode == 'linked' else 'copied'} {rel_path}")
+                logger.debug(f"{label}: {mode} {rel_path}")
             except Exception as e:
                 skipped += 1
                 logger.warning(f"Failed to materialize {label} {rel_path}: {e}")
-        if linked or copied or skipped:
+        if cloned or linked or copied or skipped:
             logger.info(
-                f"{label.capitalize()} materialization: linked={linked}, copied={copied}"
+                f"{label.capitalize()} materialization: cloned={cloned}, linked={linked}, copied={copied}"
                 + (f", skipped={skipped}" if skipped else "")
             )
     

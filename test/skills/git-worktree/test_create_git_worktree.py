@@ -45,7 +45,7 @@ script_path = Path(__file__).parent.parent.parent.parent / "plugins" / "gosu-mcp
 sys.path.insert(0, str(script_path))
 
 # Import the module under test
-from create_git_worktree import GitWorktreeCreator
+from create_git_worktree import GitWorktreeCreator, _try_clonefile
 
 
 class TestGitWorktreeCreator(unittest.TestCase):
@@ -79,7 +79,6 @@ class TestGitWorktreeCreator(unittest.TestCase):
             'branch': None,
             'worktree': None,
             'base_branch': None,
-            'plan_file': None,
             'agent_user': None,
             'copy_staged': True,
             'copy_modified': False,
@@ -328,11 +327,11 @@ class TestGitWorktreeCreator(unittest.TestCase):
             self.assertFalse(copied_file.exists())
 
     def test_copy_git_ignored_files_nested_structure(self):
-        """Test copy_git_ignored_files preserves directory structure at depth 1.
+        """Test copy_git_ignored_files preserves directory structure to depth 5.
 
-        Scanning is bounded to workspace root + one level deep for speed
-        (typical layout: ``packages/<pkg>/node_modules``). Entries nested
-        deeper are intentionally not picked up.
+        The enumeration walk explores up to 5 directory levels (deep
+        monorepos); entries nested beyond that are intentionally not
+        picked up.
         """
         args = self.create_mock_args()
         with patch('os.getcwd', return_value=str(self.main_workspace)):
@@ -342,15 +341,20 @@ class TestGitWorktreeCreator(unittest.TestCase):
             worktree_dir.mkdir()
             creator.worktree_dir = worktree_dir
 
-            # Depth 1: subdir/.env — within the supported scan range
+            # 1 subdir deep — well within the scan range
             subdir = self.main_workspace / "subdir"
             subdir.mkdir()
             (subdir / ".env").write_text("SHALLOW=true")
 
-            # Depth 2: deeper/even-deeper/.env — beyond the scan range
-            deep = self.main_workspace / "deeper" / "even-deeper"
+            # 4 subdirs deep — still within the depth-5 walk
+            deep = self.main_workspace / "l1" / "l2" / "l3" / "l4"
             deep.mkdir(parents=True)
             (deep / ".env").write_text("DEEP=true")
+
+            # 5 subdirs deep — beyond the scan range
+            too_deep = deep / "l5"
+            too_deep.mkdir()
+            (too_deep / ".env").write_text("TOO_DEEP=true")
 
             creator.copy_git_ignored_files()
 
@@ -358,8 +362,303 @@ class TestGitWorktreeCreator(unittest.TestCase):
             self.assertTrue(shallow_copy.exists())
             self.assertEqual(shallow_copy.read_text(), "SHALLOW=true")
 
-            deep_copy = worktree_dir / "deeper" / "even-deeper" / ".env"
-            self.assertFalse(deep_copy.exists(), "Files deeper than 1 level should not be picked up")
+            deep_copy = worktree_dir / "l1" / "l2" / "l3" / "l4" / ".env"
+            self.assertTrue(deep_copy.exists(), "Files up to 4 subdirs deep should be picked up")
+            self.assertEqual(deep_copy.read_text(), "DEEP=true")
+
+            too_deep_copy = worktree_dir / "l1" / "l2" / "l3" / "l4" / "l5" / ".env"
+            self.assertFalse(too_deep_copy.exists(), "Files deeper than the depth-5 walk should not be picked up")
+
+    def test_link_tree_clonefile_independence(self):
+        """_link_tree prefers clonefile on macOS; the clone is CoW-independent."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            src = self.main_workspace / "tree_src"
+            (src / "nested").mkdir(parents=True)
+            (src / "nested" / "file.txt").write_text("original")
+            (src / "top.txt").write_text("top")
+
+            dst = Path(self.temp_dir) / "tree_dst"
+            mode = creator._link_tree(src, dst)
+
+            # Contents must match regardless of the strategy used
+            self.assertEqual((dst / "nested" / "file.txt").read_text(), "original")
+            self.assertEqual((dst / "top.txt").read_text(), "top")
+
+            # Only assert the clone path when the temp filesystem actually
+            # supports clonefile (TMPDIR may point at a non-APFS mount).
+            probe_src = Path(self.temp_dir) / "clone_probe_src"
+            probe_src.write_text("probe")
+            if _try_clonefile(probe_src, Path(self.temp_dir) / "clone_probe_dst"):
+                self.assertEqual(mode, 'cloned', "clonefile should be preferred when supported")
+
+            if mode == 'cloned':
+                # In-place write in the clone must not leak back to the source
+                with open(dst / "nested" / "file.txt", 'a') as f:
+                    f.write("-worktree-edit")
+                self.assertEqual((src / "nested" / "file.txt").read_text(), "original")
+
+    def test_symlink_children_layout(self):
+        """Symlink-children tier: packages symlinked, dot-entries materialized, .cache skipped."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            node_modules = self.main_workspace / "node_modules"
+            (node_modules / "pkg-a").mkdir(parents=True)
+            (node_modules / "pkg-a" / "index.js").write_text("module.exports = 1;")
+            (node_modules / "@scope" / "pkg-b").mkdir(parents=True)
+            (node_modules / "@scope" / "pkg-b" / "index.js").write_text("module.exports = 2;")
+            bin_dir = node_modules / ".bin"
+            bin_dir.mkdir()
+            (bin_dir / "tool").symlink_to("../pkg-a/index.js")
+            cache_dir = node_modules / ".cache"
+            cache_dir.mkdir()
+            (cache_dir / "junk.txt").write_text("cache junk")
+            (node_modules / ".package-lock.json").write_text("{}")
+
+            # Force the symlink-children tier by disabling clonefile
+            with patch('create_git_worktree._try_clonefile', return_value=False):
+                creator.copy_git_ignored_files()
+
+            wt_nm = worktree_dir / "node_modules"
+            self.assertTrue(wt_nm.is_dir())
+            self.assertFalse(wt_nm.is_symlink(), "node_modules itself must be a real dir")
+
+            pkg_a = wt_nm / "pkg-a"
+            self.assertTrue(pkg_a.is_symlink(), "top-level packages should be symlinks")
+            self.assertEqual(pkg_a.resolve(), (node_modules / "pkg-a").resolve())
+            self.assertEqual((pkg_a / "index.js").read_text(), "module.exports = 1;")
+
+            scope = wt_nm / "@scope"
+            self.assertTrue(scope.is_symlink(), "@scope dirs should be symlinks")
+            self.assertEqual((scope / "pkg-b" / "index.js").read_text(), "module.exports = 2;")
+
+            wt_bin = wt_nm / ".bin"
+            self.assertTrue(wt_bin.is_dir())
+            self.assertFalse(wt_bin.is_symlink(), ".bin must not be symlinked to the main workspace")
+            self.assertTrue((wt_bin / "tool").is_symlink(), "relative .bin shims should be preserved")
+
+            self.assertFalse((wt_nm / ".cache").exists(), ".cache should be skipped entirely")
+
+            lock = wt_nm / ".package-lock.json"
+            self.assertTrue(lock.is_file())
+            self.assertFalse(lock.is_symlink(), "metadata files must not be symlinked")
+
+    def test_symlink_children_applies_to_venv_and_vendor(self):
+        """Symlink-children tier applies to .venv and vendor dep dirs too."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            venv = self.main_workspace / ".venv"
+            (venv / "lib" / "python3.12" / "site-packages").mkdir(parents=True)
+            (venv / "pyvenv.cfg").write_text("home = /usr/bin")
+            vendor = self.main_workspace / "vendor"
+            (vendor / "github.com").mkdir(parents=True)
+            (vendor / "github.com" / "mod.go").write_text("package mod")
+
+            with patch('create_git_worktree._try_clonefile', return_value=False):
+                creator.copy_git_ignored_files()
+
+            wt_venv = worktree_dir / ".venv"
+            self.assertTrue(wt_venv.is_dir())
+            self.assertFalse(wt_venv.is_symlink())
+            self.assertTrue((wt_venv / "lib").is_symlink(), ".venv children should be symlinks")
+            cfg = wt_venv / "pyvenv.cfg"
+            self.assertTrue(cfg.is_file())
+            self.assertFalse(cfg.is_symlink(), "pyvenv.cfg must not be symlinked")
+
+            wt_vendor = worktree_dir / "vendor"
+            self.assertFalse(wt_vendor.is_symlink())
+            self.assertTrue((wt_vendor / "github.com").is_symlink(), "vendor children should be symlinks")
+            self.assertEqual((wt_vendor / "github.com" / "mod.go").read_text(), "package mod")
+
+    def test_parallel_materialization_all_targets(self):
+        """Concurrent materialization still covers every enumerated target."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            (self.main_workspace / "node_modules" / "pkg").mkdir(parents=True)
+            (self.main_workspace / "node_modules" / "pkg" / "index.js").write_text("1")
+            (self.main_workspace / "packages" / "app1" / "node_modules" / "dep").mkdir(parents=True)
+            (self.main_workspace / "packages" / "app1" / "node_modules" / "dep" / "index.js").write_text("2")
+            (self.main_workspace / "packages" / "app2" / ".venv" / "lib").mkdir(parents=True)
+            (self.main_workspace / ".env").write_text("KEY=value")
+
+            creator.copy_git_ignored_files()
+
+            self.assertTrue((worktree_dir / "node_modules" / "pkg" / "index.js").exists())
+            self.assertTrue((worktree_dir / "packages" / "app1" / "node_modules" / "dep" / "index.js").exists())
+            self.assertTrue((worktree_dir / "packages" / "app2" / ".venv" / "lib").exists())
+            self.assertEqual((worktree_dir / ".env").read_text(), "KEY=value")
+
+    def test_symlink_children_preserves_symlink_entries(self):
+        """pnpm-style top-level symlink entries are recreated verbatim (incl. broken ones)."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            node_modules = self.main_workspace / "node_modules"
+            real_pkg = node_modules / ".pnpm" / "pkg-c@1.0.0" / "node_modules" / "pkg-c"
+            real_pkg.mkdir(parents=True)
+            (real_pkg / "index.js").write_text("module.exports = 3;")
+            (node_modules / "pkg-c").symlink_to(".pnpm/pkg-c@1.0.0/node_modules/pkg-c")
+            (node_modules / "dangling").symlink_to("does-not-exist")
+
+            with patch('create_git_worktree._try_clonefile', return_value=False):
+                creator.copy_git_ignored_files()
+
+            wt_nm = worktree_dir / "node_modules"
+            pkg_c = wt_nm / "pkg-c"
+            self.assertTrue(pkg_c.is_symlink())
+            self.assertEqual(os.readlink(pkg_c), ".pnpm/pkg-c@1.0.0/node_modules/pkg-c",
+                             "relative symlink target must be recreated verbatim")
+            # Resolves inside THIS worktree because .pnpm was hard-linked in
+            self.assertEqual((pkg_c / "index.js").read_text(), "module.exports = 3;")
+
+            dangling = wt_nm / "dangling"
+            self.assertTrue(dangling.is_symlink(), "broken symlinks should be recreated, not dropped")
+            self.assertEqual(os.readlink(dangling), "does-not-exist")
+
+    def test_symlink_children_per_child_fallback(self):
+        """A failing symlink for one child falls back to hard-link/copy; siblings unaffected."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            node_modules = self.main_workspace / "node_modules"
+            for name in ("pkg-good", "pkg-bad"):
+                (node_modules / name).mkdir(parents=True)
+                (node_modules / name / "index.js").write_text(f"// {name}")
+
+            real_symlink_to = Path.symlink_to
+
+            def flaky_symlink_to(path_self, target, *fn_args, **fn_kwargs):
+                if path_self.name == 'pkg-bad':
+                    raise OSError("simulated symlink failure")
+                return real_symlink_to(path_self, target, *fn_args, **fn_kwargs)
+
+            with patch('create_git_worktree._try_clonefile', return_value=False), \
+                 patch.object(Path, 'symlink_to', flaky_symlink_to):
+                creator.copy_git_ignored_files()
+
+            wt_nm = worktree_dir / "node_modules"
+            good = wt_nm / "pkg-good"
+            self.assertTrue(good.is_symlink(), "healthy siblings must still be symlinked")
+            bad = wt_nm / "pkg-bad"
+            self.assertTrue(bad.exists(), "failed child must be materialized via fallback")
+            self.assertFalse(bad.is_symlink())
+            self.assertEqual((bad / "index.js").read_text(), "// pkg-bad")
+
+    def test_parallel_materialization_failure_isolation(self):
+        """One failing target must not prevent other targets from materializing."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            (self.main_workspace / "node_modules" / "pkg").mkdir(parents=True)
+            (self.main_workspace / "node_modules" / "pkg" / "index.js").write_text("1")
+            (self.main_workspace / ".env").write_text("KEY=value")
+
+            real_materialize = GitWorktreeCreator._materialize_ignored_target
+
+            def flaky_materialize(creator_self, src):
+                if src.name == '.env':
+                    raise OSError("simulated target failure")
+                return real_materialize(creator_self, src)
+
+            with patch.object(GitWorktreeCreator, '_materialize_ignored_target', flaky_materialize), \
+                 self.assertLogs('create_git_worktree', level='WARNING') as logs:
+                creator.copy_git_ignored_files()
+
+            self.assertTrue(any("Failed to materialize" in line for line in logs.output))
+            self.assertTrue((worktree_dir / "node_modules" / "pkg" / "index.js").exists(),
+                            "other targets must still be materialized")
+            self.assertFalse((worktree_dir / ".env").exists())
+
+    def test_tracked_dep_dir_is_skipped(self):
+        """A git-tracked vendor/ must not be clobbered by dep-dir materialization."""
+        args = self.create_mock_args()
+        with patch('os.getcwd', return_value=str(self.main_workspace)):
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            vendor = self.main_workspace / "vendor" / "github.com" / "dep"
+            vendor.mkdir(parents=True)
+            (vendor / "mod.go").write_text("package dep")
+            subprocess.run(['git', 'add', 'vendor'], cwd=self.main_workspace,
+                           capture_output=True, check=True)
+            subprocess.run(['git', 'commit', '-m', 'vendor deps'], cwd=self.main_workspace,
+                           capture_output=True, check=True)
+            # An ignored dep dir alongside it must still be materialized
+            (self.main_workspace / "node_modules" / "pkg").mkdir(parents=True)
+
+            creator.copy_git_ignored_files()
+
+            self.assertFalse((worktree_dir / "vendor").exists(),
+                             "tracked vendor/ comes from the checkout, not from materialization")
+            self.assertTrue((worktree_dir / "node_modules" / "pkg").exists())
+
+    def test_untracked_user_code_never_symlinked(self):
+        """User-code materialization must never symlink into the main workspace."""
+        args = self.create_mock_args(copy_untracked=True)
+
+        orig_dir = Path.cwd()
+        try:
+            os.chdir(self.main_workspace)
+            creator = GitWorktreeCreator(args)
+
+            worktree_dir = Path(self.temp_dir) / "test_worktree"
+            worktree_dir.mkdir()
+            creator.worktree_dir = worktree_dir
+
+            feature = self.main_workspace / "feature_dir" / "sub"
+            feature.mkdir(parents=True)
+            (feature / "a.py").write_text("print('a')")
+
+            with patch('create_git_worktree._try_clonefile', return_value=False):
+                creator.copy_untracked_files()
+
+            copied = worktree_dir / "feature_dir"
+            self.assertTrue((copied / "sub" / "a.py").exists())
+            for path in [copied] + list(copied.rglob("*")):
+                self.assertFalse(path.is_symlink(),
+                                 f"user code must not be symlinked: {path}")
+                self.assertTrue(str(Path(os.path.realpath(path))).startswith(str(worktree_dir.resolve())),
+                                f"user code must stay inside the worktree: {path}")
+        finally:
+            os.chdir(orig_dir)
 
     def test_create_symlinks(self):
         """Test create_symlinks functionality"""
@@ -432,58 +731,6 @@ class TestGitWorktreeCreator(unittest.TestCase):
             # Verify symlink was replaced
             self.assertTrue(existing_symlink.is_symlink())
             self.assertEqual(existing_symlink.resolve(), settings_file.resolve())
-
-    def test_copy_plan_file_success(self):
-        """Test copy_plan_file with existing file"""
-        args = self.create_mock_args()
-        with patch('os.getcwd', return_value=str(self.main_workspace)):
-            creator = GitWorktreeCreator(args)
-
-            # Create a mock worktree directory
-            worktree_dir = Path(self.temp_dir) / "test_worktree"
-            worktree_dir.mkdir()
-            creator.worktree_dir = worktree_dir
-
-            # Create plan file
-            plan_file = Path(self.temp_dir) / "task-plan.md"
-            plan_file.write_text("# Task Plan\n- Task 1\n- Task 2")
-
-            creator.args.plan_file = str(plan_file)
-            creator.copy_plan_file()
-
-            # Verify plan file was copied
-            copied_file = worktree_dir / "worktree-agent-task-plan.md"
-            self.assertTrue(copied_file.exists())
-            self.assertEqual(copied_file.read_text(), "# Task Plan\n- Task 1\n- Task 2")
-
-    def test_copy_plan_file_not_found(self):
-        """Test copy_plan_file with non-existent file"""
-        args = self.create_mock_args()
-        with patch('os.getcwd', return_value=str(self.main_workspace)):
-            creator = GitWorktreeCreator(args)
-
-            # Create a mock worktree directory
-            worktree_dir = Path(self.temp_dir) / "test_worktree"
-            worktree_dir.mkdir()
-            creator.worktree_dir = worktree_dir
-
-            creator.args.plan_file = "/nonexistent/file.md"
-            # Should not raise an error, just log warning
-            creator.copy_plan_file()
-
-    def test_copy_plan_file_none(self):
-        """Test copy_plan_file with no plan file specified"""
-        args = self.create_mock_args()
-        with patch('os.getcwd', return_value=str(self.main_workspace)):
-            creator = GitWorktreeCreator(args)
-
-            # Create a mock worktree directory
-            worktree_dir = Path(self.temp_dir) / "test_worktree"
-            worktree_dir.mkdir()
-            creator.worktree_dir = worktree_dir
-
-            # Should not raise an error
-            creator.copy_plan_file()
 
     def test_set_ownership(self):
         """Test set_ownership runs chown when target user differs from current"""
@@ -1212,7 +1459,7 @@ class TestClaudeHookMode(unittest.TestCase):
         """cwd_override sets main_workspace correctly"""
         args = argparse.Namespace(
             prompt=[], branch=None, worktree=None, base_branch=None,
-            plan_file=None, agent_user=None, copy_staged=True,
+            agent_user=None, copy_staged=True,
             copy_modified=False, copy_untracked=False,
             worktree_parent_dir=str(self.temp_dir), verbose=False,
             cwd_override=str(self.main_workspace),
@@ -1224,7 +1471,7 @@ class TestClaudeHookMode(unittest.TestCase):
         """No cwd_override falls back to Path.cwd() (backward compat)"""
         args = argparse.Namespace(
             prompt=[], branch=None, worktree=None, base_branch=None,
-            plan_file=None, agent_user=None, copy_staged=True,
+            agent_user=None, copy_staged=True,
             copy_modified=False, copy_untracked=False,
             worktree_parent_dir=str(self.temp_dir), verbose=False,
         )
@@ -1289,7 +1536,6 @@ class TestGitWorktreeCreatorIntegration(unittest.TestCase):
             'branch': None,
             'worktree': None,
             'base_branch': None,
-            'plan_file': None,
             'agent_user': None,
             'copy_staged': True,
             'copy_modified': False,
